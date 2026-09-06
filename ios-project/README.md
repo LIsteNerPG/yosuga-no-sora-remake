@@ -9,7 +9,7 @@ Requirements:
 - macOS with a full Xcode installation
 - CMake 3.24 or newer
 - Git LFS assets downloaded with `git lfs pull`
-- Xcode with an iOS 15 or newer device SDK
+- Xcode capable of building with an iOS 14.0 deployment target (CI uses Xcode 16.4)
 
 Generate the Xcode project:
 
@@ -22,7 +22,13 @@ Choose the `krkrsdl2` target and your Apple Development Team before installing
 on a device. Local device builds use Xcode's automatic signing, and the
 generator preserves the selected Team when the project is regenerated. The
 generated project embeds `data/` inside the application bundle and targets
-iPhone and iPad in landscape orientation.
+iPhone and iPad in landscape orientation. Its default deployment target is
+iOS 14.0; set `IOS_DEPLOYMENT_TARGET` only when a different minimum version is
+required.
+
+The app's Documents directory is available through the Files document-browser
+integration. This is enabled by `UISupportsDocumentBrowser` together with file
+sharing and in-place document access; it does not display a privacy prompt.
 
 The first application installed with a Personal Team may require explicit
 approval on the iPhone under **Settings > General > VPN & Device Management**.

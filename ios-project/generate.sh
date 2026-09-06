@@ -8,7 +8,7 @@ CONFIGURATION="${IOS_CONFIGURATION:-Release}"
 VERSION_NAME="${IOS_VERSION_NAME:-0.0.0}"
 BUILD_NUMBER="${IOS_BUILD_NUMBER:-1}"
 BUNDLE_IDENTIFIER="${IOS_BUNDLE_IDENTIFIER:-com.lightwinder.yosuganosora.hdremake}"
-DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-15.0}"
+DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-14.0}"
 CODE_SIGN_IDENTITY="${IOS_CODE_SIGN_IDENTITY:-}"
 DEVELOPMENT_TEAM="${IOS_DEVELOPMENT_TEAM:-}"
 PROVISIONING_PROFILE="${IOS_PROVISIONING_PROFILE:-}"
@@ -83,9 +83,14 @@ if [[ ! "$BUNDLE_IDENTIFIER" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]]; then
 	echo "IOS_BUNDLE_IDENTIFIER is invalid: $BUNDLE_IDENTIFIER" >&2
 	exit 1
 fi
+if [[ ! "$DEPLOYMENT_TARGET" =~ ^[0-9]+\.[0-9]+$ ]]; then
+	echo "IOS_DEPLOYMENT_TARGET must use major.minor format (for example 14.0)." >&2
+	exit 1
+fi
 
 echo "Using Xcode: $SELECTED_DEVELOPER_DIR"
 echo "Using CMake: $CMAKE_BIN"
+echo "Minimum iOS version: $DEPLOYMENT_TARGET"
 if [[ -n "$DEVELOPMENT_TEAM" ]]; then
 	echo "Using Apple Development Team: $DEVELOPMENT_TEAM"
 else

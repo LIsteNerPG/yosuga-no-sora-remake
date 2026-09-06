@@ -76,13 +76,14 @@
 	<array>
 		<string>audio</string>
 	</array>
-	<!-- File sharing: expose the app's Documents folder so saves live in a
-	     user-reachable location outside the private container. Saves are
-	     still inside the sandbox so Photos never indexes them into the
-	     system photo library. -->
+	<!-- Document access: expose the app's Documents folder to Files and other
+	     document providers. Saves remain inside the app sandbox, so Photos
+	     never indexes them into the system photo library. -->
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UISupportsDocumentBrowser</key>
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>

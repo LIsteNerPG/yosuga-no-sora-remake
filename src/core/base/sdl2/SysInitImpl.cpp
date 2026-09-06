@@ -928,6 +928,32 @@ static void TVPInitRandomGenerator()
 //---------------------------------------------------------------------------
 void TVPLoadExternalPatchArchives(const char *saveDirUtf8)
 {
+	/* Keep this list in the same order as data/startup.tjs.  Registering the
+	   built-in paths before patch paths is important: TVP's auto-path table
+	   resolves duplicate basenames in favour of the path added last, while
+	   TVPAddAutoPath deliberately ignores attempts to add the same path twice.
+	   startup.tjs can therefore register these paths again without moving them
+	   ahead of the patches. */
+	static const tjs_char * const runtimePaths[] = {
+		TJS_W("system/"),
+		TJS_W("scenario/"),
+		TJS_W("bg_1920/"),
+		TJS_W("event_1920/"),
+		TJS_W("character_1920/"),
+		TJS_W("char/"),
+		TJS_W("audio_ogg/"),
+		TJS_W("font/"),
+		TJS_W("frame/"),
+		TJS_W("frame_m2/"),
+		TJS_W("rule/"),
+		TJS_W("thumb/"),
+		TJS_W("ui_1920/")
+	};
+	static const size_t runtimePathCount =
+		sizeof(runtimePaths) / sizeof(runtimePaths[0]);
+	for(size_t i = 0; i < runtimePathCount; ++i)
+		TVPAddAutoPath(ttstr(runtimePaths[i]));
+
 	/* Also write a human-readable log to the public folder so the result can
 	   be inspected with a file manager (no adb/logcat needed). */
 	FILE *scanLog = NULL;
@@ -998,7 +1024,12 @@ void TVPLoadExternalPatchArchives(const char *saveDirUtf8)
 			if(TVPCheckExistentLocalFile(nativeName))
 			{
 				ttstr archiveName = ttstr(name + TJS_W(">"));
+				/* The archive root only exposes files stored directly at its root.
+				   Add every runtime subdirectory as well so a normal patch layout,
+				   e.g. system/LoadSaveWindowHD.tjs, can override bundled data. */
 				TVPAddAutoPath(archiveName);
+				for(size_t p = 0; p < runtimePathCount; ++p)
+					TVPAddAutoPath(archiveName + ttstr(runtimePaths[p]));
 				if(loadedPatchPath.empty())
 					loadedPatchPath = name;
 				ttstr log(TJS_W("(info) Loaded patch archive: "));

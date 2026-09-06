@@ -25,6 +25,9 @@ concurrency:
   group: release-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  IOS_DEPLOYMENT_TARGET: '14.0'
+
 jobs:
   build-and-release:
     name: Build iPhone IPA and publish
@@ -239,6 +242,7 @@ jobs:
             -destination 'generic/platform=iOS'
             -derivedDataPath "$RUNNER_TEMP/ios-derived-data"
             -parallelizeTargets
+            "IPHONEOS_DEPLOYMENT_TARGET=$IOS_DEPLOYMENT_TARGET"
           )
           if [[ "$SIGNED" == 'true' ]]; then
             args+=(
@@ -278,6 +282,10 @@ jobs:
             "$VERSION_NAME" ]]
           [[ "$(plutil -extract CFBundleVersion raw "$app/Info.plist")" == \
             "$VERSION_CODE" ]]
+          [[ "$(plutil -extract MinimumOSVersion raw "$app/Info.plist")" == \
+            "$IOS_DEPLOYMENT_TARGET" ]]
+          [[ "$(plutil -extract UISupportsDocumentBrowser raw "$app/Info.plist")" == \
+            'true' ]]
           if [[ "$SIGNED" == 'true' ]]; then
             [[ -f "$app/embedded.mobileprovision" ]]
             codesign --verify --deep --strict --verbose=2 "$app"
@@ -320,6 +328,8 @@ jobs:
           Release: $RELEASE_TAG
           Commit: $GITHUB_SHA
           Signing: $IOS_SIGNING_MODE
+          Minimum iOS version: $IOS_DEPLOYMENT_TARGET
+          Document browser support: enabled
           Native optimization: Release
           EOF
           echo "asset-directory=$asset_dir" >> "$GITHUB_OUTPUT"
