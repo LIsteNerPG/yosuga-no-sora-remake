@@ -55,7 +55,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.workflow }}-${{ github.ref }}
+  # Manual dispatches all share the same github.ref, so without the release tag
+  # in the group key a second dispatch cancels a run that is already half way
+  # through its smoke test. Keying on the tag keeps different releases
+  # independent while still serialising repeats of the same one.
+  group: release-${{ github.workflow }}-${{ inputs.release_tag || github.ref }}
   cancel-in-progress: false
 
 env:
