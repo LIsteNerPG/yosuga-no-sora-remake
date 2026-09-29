@@ -19,7 +19,14 @@ int tTVPScreen::GetWidth() {
 	return ::GetSystemMetrics(SM_CXSCREEN);
 #endif
 	SDL_Rect r;
-	if (SDL_GetDisplayUsableBounds(0, &r) != 0)
+	/* The FULL display bounds, not the usable area: usable excludes the desktop
+	 * panel/dock, so with a bottom dock System.screenHeight came back as e.g.
+	 * 1040 instead of 1080. Window.tjs then derived a wider-than-16:9 canvas
+	 * (1994x1080 for a 1920x1080 screen) and centred the 1920x1080 base layer
+	 * inside it, which showed up as a black bar down each side in fullscreen.
+	 * The Windows build reads rcMonitor (the whole screen), so this also
+	 * restores the behaviour that platform has. */
+	if (SDL_GetDisplayBounds(0, &r) != 0)
 	{
 		return 0;
 	}
@@ -35,7 +42,10 @@ int tTVPScreen::GetHeight() {
 	return ::GetSystemMetrics(SM_CYSCREEN);
 #endif
 	SDL_Rect r;
-	if (SDL_GetDisplayUsableBounds(0, &r) != 0)
+	/* See GetWidth(): the usable area is smaller than the screen whenever a
+	 * panel or dock is present, and the game's fullscreen canvas maths must use
+	 * the real screen size to avoid letterboxing. */
+	if (SDL_GetDisplayBounds(0, &r) != 0)
 	{
 		return 0;
 	}
