@@ -396,9 +396,27 @@ jobs:
               echo
               echo "=== xlsclients ==="
               xlsclients -l 2>&1 | head -n 40 || true
+              echo
+              # The engine logs the X11 id of its own window; ask the host
+              # directly whether that id exists here.
+              wid="$(grep -o 'VIDWINDOW x11 id=0x[0-9a-f]*' "$log" 2>/dev/null | tail -n 1 | awk '{print $4}')"
+              echo "=== engine X11 window id: ${wid:-<not logged yet>} ==="
+              if [[ -n "$wid" ]]; then
+                xwininfo -id "$wid" 2>&1 | head -n 12 || true
+              fi
             } > "$diag" 2>&1
             import -window root "$shot" 2>/dev/null || true
           ) &
+          # Ask the container itself what it sees. If the engine's window id is
+          # visible in there but not on the host's :99, the container is talking
+          # to a different X server and no screenshot taken from the host can
+          # ever show the game.
+          set +e
+          echo 'echo "container DISPLAY=[$DISPLAY]"; ls -l /tmp/.X11-unix/ 2>&1; echo "--- x11 mounts ---"; grep -i "x11" /proc/self/mountinfo 2>/dev/null | head -n 10' \
+            | timeout 60 ll-builder run --exec /bin/sh > "$RUNNER_TEMP/container-env.txt" 2>&1
+          set -e
+          echo "--- container environment ---"
+          cat "$RUNNER_TEMP/container-env.txt" 2>/dev/null || true
           set +e
           timeout --signal=TERM --kill-after=30 180 ll-builder run > "$log" 2>&1
           status=$?
