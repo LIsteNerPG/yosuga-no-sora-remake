@@ -1080,15 +1080,37 @@ TVPWindowWindow::TVPWindowWindow(tTJSNI_Window *w)
 #endif
 
 		this->bitmapCompletion = new TVPSDLBitmapCompletion();
-		/* The engine always paints into its own RGB surface, which
-		 * SetPaintBoxSize allocates for every platform. TickBeat then either
-		 * uploads it into the renderer texture (platforms with a renderer) or
-		 * scales it into the window surface (Linux, see the software blit
-		 * there). Taking the window surface here instead made
-		 * SDL_UpdateTexture upload the untouched window framebuffer - a black
-		 * picture - and freeing it later left SDL's own window->surface
-		 * dangling. */
-		this->surface = nullptr;
+		/* The engine always paints into its own RGB surface. It is recreated by
+		 * SetPaintBoxSize whenever the layer size changes, but an initial one
+		 * is allocated here so the first frames have a target even if that
+		 * call has not happened yet - relying on SetPaintBoxSize alone left
+		 * the window permanently empty when it did not fire.
+		 * TickBeat then either uploads this surface into the renderer texture
+		 * (platforms with a renderer) or scales it into the window surface
+		 * (Linux, see the software blit there). Taking the window surface here
+		 * instead made SDL_UpdateTexture upload the untouched window
+		 * framebuffer - a black picture - and freeing it later left SDL's own
+		 * window->surface dangling. */
+		{
+			int initial_w = 0;
+			int initial_h = 0;
+			SDL_GetWindowSize(this->window, &initial_w, &initial_h);
+			if (initial_w <= 0 || initial_h <= 0)
+			{
+				initial_w = 640;
+				initial_h = 480;
+			}
+			this->surface = SDL_CreateRGBSurface(0, initial_w, initial_h, 32,
+				0x00ff0000, 0x0000ff00, 0x000000ff, 0);
+			if (!this->surface)
+			{
+				TVPThrowExceptionMessage(TJS_W("Cannot create surface: %1"), ttstr(SDL_GetError()));
+			}
+			SDL_memset(this->surface->pixels, 0, (size_t)this->surface->h * (size_t)this->surface->pitch);
+			this->bitmapCompletion->surface = this->surface;
+			SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "VIDINIT surface=%p %dx%d renderer=%p",
+				(void *)this->surface, initial_w, initial_h, (void *)this->renderer);
+		}
 		this->texture = nullptr;
 		if (this->renderer)
 		{
@@ -1228,13 +1250,11 @@ void TVPWindowWindow::SetPaintBoxSize(tjs_int w, tjs_int h)
 			TVPThrowExceptionMessage(TJS_W("Cannot create surface: %1"), ttstr(SDL_GetError()));
 		}
 		this->bitmapCompletion->surface = this->surface;
+		SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "VIDPAINTBOX %dx%d surface=%p renderer=%p",
+			w, h, (void *)this->surface, (void *)this->renderer);
 		/* SDL_CreateRGBSurface leaves the pixel memory uninitialised. Until
 		 * the game script paints its first frame the TickBeat render path
-		 * uploads whatever garbage sits in the buffer and RenderCopy draws
-		 * the WHOLE texture (FULL_UPDATES) - on OHOS this flashed a white
-		 * frame right after starting the game, before the logo movie. Clear
-		 * both the drawing surface and the renderer texture so the first
-		 * presented frame is black. */
+		 * presents whatever garbage sits in the buffer, so clear it. */
 		SDL_memset(this->surface->pixels, 0, (size_t)this->surface->h * (size_t)this->surface->pitch);
 		if (this->texture)
 		{
@@ -2301,7 +2321,17 @@ void TVPWindowWindow::TickBeat()
 				SDL_Surface *window_surface = SDL_GetWindowSurface(this->window);
 				if (window_surface != nullptr && window_surface != this->surface)
 				{
-					SDL_BlitScaled(this->surface, nullptr, window_surface, nullptr);
+					int blit = SDL_BlitScaled(this->surface, nullptr, window_surface, nullptr);
+					static int soft_blit_logs = 0;
+					if (soft_blit_logs < 3)
+					{
+						SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+							"VIDSOFTBLIT src=%dx%d dst=%dx%d result=%d err=%s",
+							this->surface->w, this->surface->h,
+							window_surface->w, window_surface->h,
+							blit, blit == 0 ? "-" : SDL_GetError());
+						soft_blit_logs++;
+					}
 				}
 				SDL_UpdateWindowSurfaceRects(this->window, &rect, 1);
 				this->hasDrawn = true;
