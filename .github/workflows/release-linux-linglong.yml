@@ -302,7 +302,26 @@ jobs:
           # ccache is a build_depends entry of linglong.yaml and writes to the
           # host's ~/.cache/ccache (the container maps $HOME), which is exactly
           # the directory the cache steps above restore and save.
-          ll-builder build
+          #
+          # Building starts by pulling the base and the apt dependencies from
+          # the linglong remote, and that lookup intermittently times out with
+          # "stage pull dependency error" / "cannot send request to remote
+          # server" - an infrastructure hiccup that killed one whole run in a
+          # few minutes without compiling anything. Retry a few times so a
+          # transient network failure does not lose a 20 minute build.
+          built=0
+          for attempt in 1 2 3; do
+            if ll-builder build; then
+              built=1
+              break
+            fi
+            echo "::warning::ll-builder build failed on attempt ${attempt}; retrying in 30s"
+            sleep 30
+          done
+          if [[ "$built" != "1" ]]; then
+            echo "ll-builder build failed after 3 attempts"
+            exit 1
+          fi
           ll-builder list
 
       - name: Save cached ccache
