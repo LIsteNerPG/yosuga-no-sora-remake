@@ -1749,16 +1749,14 @@ void TVPWindowWindow::SetWidth(tjs_int w)
 		else
 #endif
 		SDL_SetWindowSize(this->window, w, h);
-		if (!this->renderer && this->surface)
-		{
-			this->bitmapCompletion->surface = nullptr;
-			this->surface = SDL_GetWindowSurface(this->window);
-			if (!this->surface)
-			{
-				TVPThrowExceptionMessage(TJS_W("Cannot get surface from SDL window: %1"), ttstr(SDL_GetError()));
-			}
-			this->bitmapCompletion->surface = this->surface;
-		}
+		/* The window was resized. The engine's own drawing surface keeps its
+		 * size (SetPaintBoxSize recreates it when the layer size changes) and
+		 * TickBeat scales it into the window surface, so there is nothing to do
+		 * here. The original window-surface path replaced this->surface with
+		 * the window surface at this point; in the current architecture that
+		 * defeats the scaling entirely, because SDL_BlitScaled then sees source
+		 * and destination as the same surface and does nothing - which is
+		 * exactly why choosing a smaller resolution only shrank the window. */
 	}
 #endif
 #ifdef KRKRSDL2_ENABLE_ZOOM
@@ -1784,16 +1782,14 @@ void TVPWindowWindow::SetHeight(tjs_int h)
 		else
 #endif
 		SDL_SetWindowSize(this->window, w, h);
-		if (!this->renderer && this->surface)
-		{
-			this->bitmapCompletion->surface = nullptr;
-			this->surface = SDL_GetWindowSurface(this->window);
-			if (!this->surface)
-			{
-				TVPThrowExceptionMessage(TJS_W("Cannot get surface from SDL window: %1"), ttstr(SDL_GetError()));
-			}
-			this->bitmapCompletion->surface = this->surface;
-		}
+		/* The window was resized. The engine's own drawing surface keeps its
+		 * size (SetPaintBoxSize recreates it when the layer size changes) and
+		 * TickBeat scales it into the window surface, so there is nothing to do
+		 * here. The original window-surface path replaced this->surface with
+		 * the window surface at this point; in the current architecture that
+		 * defeats the scaling entirely, because SDL_BlitScaled then sees source
+		 * and destination as the same surface and does nothing - which is
+		 * exactly why choosing a smaller resolution only shrank the window. */
 	}
 #endif
 #ifdef KRKRSDL2_ENABLE_ZOOM
@@ -1815,16 +1811,14 @@ void TVPWindowWindow::SetSize(tjs_int w, tjs_int h)
 		else
 #endif
 		SDL_SetWindowSize(this->window, w, h);
-		if (!this->renderer && this->surface)
-		{
-			this->bitmapCompletion->surface = nullptr;
-			this->surface = SDL_GetWindowSurface(this->window);
-			if (!this->surface)
-			{
-				TVPThrowExceptionMessage(TJS_W("Cannot get surface from SDL window: %1"), ttstr(SDL_GetError()));
-			}
-			this->bitmapCompletion->surface = this->surface;
-		}
+		/* The window was resized. The engine's own drawing surface keeps its
+		 * size (SetPaintBoxSize recreates it when the layer size changes) and
+		 * TickBeat scales it into the window surface, so there is nothing to do
+		 * here. The original window-surface path replaced this->surface with
+		 * the window surface at this point; in the current architecture that
+		 * defeats the scaling entirely, because SDL_BlitScaled then sees source
+		 * and destination as the same surface and does nothing - which is
+		 * exactly why choosing a smaller resolution only shrank the window. */
 	}
 #endif
 #ifdef KRKRSDL2_ENABLE_ZOOM
