@@ -319,20 +319,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends xvfb mesa-utils libgl1-mesa-dri
+          sudo apt-get install -y --no-install-recommends \
+            xvfb x11-utils imagemagick python3-pil mesa-utils libgl1-mesa-dri
+          # Use an explicit Xvfb display so the screenshot below is taken from
+          # the very server the game renders into.
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          sleep 3
+          shot="$RUNNER_TEMP/linglong-shot.png"
           log="$RUNNER_TEMP/linglong-run.log"
+          rm -f "$shot"
+          # The engine needs a while to initialise, switch to fullscreen and
+          # paint its first frames; grab the framebuffer while it still runs.
+          ( sleep 100; import -window root "$shot" 2>/dev/null || true ) &
           set +e
-          timeout --signal=TERM --kill-after=30 180 \
-            xvfb-run -a -s '-screen 0 1280x720x24' ll-builder run > "$log" 2>&1
+          timeout --signal=TERM --kill-after=30 180 ll-builder run > "$log" 2>&1
           status=$?
           set -e
           echo "--- ll-builder run exit status: $status ---"
-          tail -n 120 "$log" || true
-          # 124 means the engine was still running when the timeout fired, which
-          # is the expected outcome for a game that only exits from its own menu.
-          if [[ "$status" -ne 124 && "$status" -ne 0 ]]; then
-            echo "::warning::the headless run exited with status $status"
+          grep -v 'LYRIMGCHG' "$log" | tail -n 80 || true
+          ls -l "$shot" 2>/dev/null || echo "no screenshot was captured"
+
+      - name: Verify the headless run rendered a picture
+        if: steps.release.outputs.mode == 'full' && steps.release.outputs.smoke-test == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shot="$RUNNER_TEMP/linglong-shot.png"
+          if [[ ! -f "$shot" ]]; then
+            echo "No screenshot was captured; skipping the framebuffer check."
+            exit 0
           fi
+          # Exit status 124 only says "the game was still running": a window that
+          # never receives a single frame keeps its decorations and shows what
+          # was behind it, and every other check stays green. That is how the
+          # "empty window" regression shipped, so the framebuffer itself is
+          # inspected here and this step fails the run when nothing was drawn.
+          python3 tools/check_smoke_screenshot.py "$shot"
 
       - name: Export the linglong package
         if: steps.release.outputs.mode == 'full'

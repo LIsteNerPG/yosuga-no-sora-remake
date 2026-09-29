@@ -1034,18 +1034,25 @@ TVPWindowWindow::TVPWindowWindow(tTJSNI_Window *w)
 #endif
 	{
 #if !defined(__EMSCRIPTEN__) || (defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__))
-#if defined(__ANDROID__) || defined(__OHOS__) || defined(__APPLE__)
-		/* Mobile platforms and macOS: prefer the hardware renderer - GLES2
-		 * on Android/OHOS, Metal on Apple platforms (Apple deprecated
-		 * OpenGL ES and SDL2 removed its iOS GLES backend). macOS needs a
-		 * renderer so the logical-size letterbox keeps the game picture
-		 * scaled to the fullscreen window instead of 1:1 in a corner, and
-		 * the video overlay follows the same transform. On OHOS the GLES2
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(__APPLE__) || defined(__linux__)
+		/* Mobile platforms, macOS and Linux: prefer the hardware renderer -
+		 * GLES2 on Android/OHOS, Metal on Apple platforms (Apple deprecated
+		 * OpenGL ES and SDL2 removed its iOS GLES backend). These platforms
+		 * need a renderer so the logical-size letterbox keeps the game
+		 * picture scaled to the window instead of 1:1 in a corner, and the
+		 * video overlay follows the same transform. On OHOS the GLES2
 		 * probe's EGL initialization is also what makes the window's buffer
 		 * queue present software frames, so keep it even when it falls back
 		 * to software. The software renderer paints through the LockBuffer
 		 * path and TickBeat pauses whichever renderer is active while the
-		 * AVPlayer owns the surface. */
+		 * AVPlayer owns the surface.
+		 * Linux was previously left out of this list, which forced it onto
+		 * the raw window-surface path: the picture was memcpy'd 1:1 into the
+		 * window surface with no scaling at all, so choosing a smaller
+		 * resolution in the settings menu shrank the window while the
+		 * 1920x1080 layer stayed unscaled and got clipped. On a host without
+		 * hardware GL both attempts fail and the code falls back to the
+		 * window-surface path anyway, so this stays a safe degradation. */
 		this->renderer = SDL_CreateRenderer(this->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 		if (!this->renderer)
 		{
@@ -1065,12 +1072,19 @@ TVPWindowWindow::TVPWindowWindow(tTJSNI_Window *w)
 #endif
 
 		this->bitmapCompletion = new TVPSDLBitmapCompletion();
+		if (!this->renderer)
 		{
-			/* Always create the window surface: the software renderer's
-			 * SDL_RenderPresent calls SDL_UpdateWindowSurface, which needs
-			 * window->surface_valid (set by SDL_GetWindowSurface). Without
-			 * this the software framebuffer is never uploaded and the
-			 * screen stays black/stuck on the last video frame. */
+			/* Renderer-less fallback (neither the accelerated nor the software
+			 * renderer could be created): the engine paints directly into the
+			 * window surface through SDL_LockSurface + memcpy in
+			 * TVPSDLBitmapCompletion, so hand that surface over and keep it
+			 * valid across resizes (see TickBeat).
+			 * When a renderer DOES exist, this->surface must stay the engine's
+			 * own RGB surface, which SetPaintBoxSize allocates: assigning the
+			 * window surface here made every SDL_UpdateTexture upload the
+			 * engine-untouched (black) window framebuffer instead of the game
+			 * picture. Freeing it in SetPaintBoxSize would additionally leave
+			 * SDL's own window->surface dangling. */
 			this->surface = SDL_GetWindowSurface(this->window);
 			if (!this->surface)
 			{
