@@ -140,6 +140,12 @@ list(APPEND KRKRSDL2_CFLAGS
 )
 endif()
 
+if(UNIX AND NOT APPLE AND NOT ANDROID)
+# freedesktop desktop integration resources (.desktop template and the
+# hicolor icon set) used by the Linux install rules below.
+set(LINUX_RESOURCES_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/linux CACHE FILEPATH "The path to the resources for Linux.")
+endif()
+
 if(VITA)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
@@ -301,6 +307,18 @@ list(APPEND KRKRSDL2_CFLAGS
 )
 list(APPEND KRKRSDL2_LIBS
 	pthread
+)
+
+# Desktop/linglong identity. The id is compiled in because the engine derives
+# the per-user save directory from it (see ApplicationSpecialPath.h); the
+# install rules at the bottom of this file reuse the same value for the
+# .desktop file name and the icon name.
+set(KRKRSDL2_LINUX_APP_ID "io.github.shuimo0413.yosuganosora" CACHE STRING "Reverse-DNS application id of the Linux build.")
+set(KRKRSDL2_ICON_NAME "yosuganosora" CACHE STRING "hicolor icon basename installed for the Linux desktop integration.")
+set(KRKRSDL2_LINUX_DATA_SUBDIR "share/yosuga-no-sora-remake" CACHE STRING "Prefix-relative directory that receives the game data on Linux.")
+option(KRKRSDL2_INSTALL_LINUX_DATA "Install the game data alongside the Linux build (required by the linglong package)." ON)
+list(APPEND KRKRSDL2_DEFINITIONS
+	KRKRSDL2_LINUX_APP_ID="${KRKRSDL2_LINUX_APP_ID}"
 )
 endif()
 
@@ -958,7 +976,39 @@ add_dependencies(${KRKRSDL2_NAME}.nro ${KRKRSDL2_NAME})
 endif()
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-install(TARGETS ${KRKRSDL2_NAME} DESTINATION bin)
+# freedesktop/linglong installation layout. The desktop entry's Exec and the
+# linglong package 'command' list have to agree byte for byte, so both are
+# derived from the same prefix-relative layout defined here.
+
+install(TARGETS ${KRKRSDL2_NAME} RUNTIME DESTINATION bin)
+
+if(KRKRSDL2_INSTALL_LINUX_DATA)
+	if(NOT IS_DIRECTORY ${EMBED_DATA_PATH})
+		message(FATAL_ERROR "KRKRSDL2_INSTALL_LINUX_DATA is ON but the game data directory is missing: ${EMBED_DATA_PATH}")
+	endif()
+	install(DIRECTORY ${EMBED_DATA_PATH}/
+		DESTINATION ${KRKRSDL2_LINUX_DATA_SUBDIR}/data
+		PATTERN "savedata" EXCLUDE
+		PATTERN ".DS_Store" EXCLUDE
+	)
+endif()
+
+# The .desktop Exec is <prefix>/bin/krkrsdl2 plus the game data directory as
+# its single argument: the engine treats a plain path argument as the project
+# directory, which is exactly what the linglong 'command' list passes at run
+# time, so both entry points stay identical.
+set(KRKRSDL2_DESKTOP_EXEC "${CMAKE_INSTALL_PREFIX}/bin/${KRKRSDL2_NAME} ${CMAKE_INSTALL_PREFIX}/${KRKRSDL2_LINUX_DATA_SUBDIR}/data")
+set(KRKRSDL2_DESKTOP_TRY_EXEC "${CMAKE_INSTALL_PREFIX}/bin/${KRKRSDL2_NAME}")
+configure_file(
+	${LINUX_RESOURCES_ROOT}/yosuganosora.desktop.in
+	${CMAKE_CURRENT_BINARY_DIR}/${KRKRSDL2_LINUX_APP_ID}.desktop
+	@ONLY
+	NEWLINE_STYLE UNIX
+)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${KRKRSDL2_LINUX_APP_ID}.desktop
+	DESTINATION share/applications)
+install(DIRECTORY ${LINUX_RESOURCES_ROOT}/icons/hicolor
+	DESTINATION share/icons)
 endif()
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Emscripten")

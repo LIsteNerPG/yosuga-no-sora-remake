@@ -22,7 +22,9 @@ Android 移植改动）。
 - `ohos-project/`：面向 OpenHarmony 5.0（API 12）的 DevEco Studio/Hvigor 工程，
   包含 OpenHarmony SDL2 视频后端与 NAPI 入口模块，详见 `ohos-project/README.md`。
 - `platform/windows-krkrz/`：原生 Kirikiri Z Windows 运行时、插件和启动配置。
-- `tools/`：内容清单及后续发布工具。
+- `linglong.yaml`：如意玲珑（Linglong / linyaps）打包配置，Linux 构建与打包
+  说明见 `docs/linux-linglong.md`。
+- `tools/`：内容清单、发布与打包辅助工具。
 
 ## 获取源码
 
@@ -62,7 +64,8 @@ git submodule update --init --recursive
 
 SDL2 桌面端和 Android 工程均从 `data/` 读取游戏内容。Windows KRKRZ
 运行时已独立归档。目前已经支持自动打包 Windows KRKRZ、Android ARM64、
-Apple Silicon macOS、iOS ARM64 和 OpenHarmony 5.0 ARM64。
+Apple Silicon macOS、iOS ARM64、OpenHarmony 5.0 ARM64，以及 Linux x86_64
+（如意玲珑 UAB / layer）。
 
 ## 开发启动
 
@@ -85,6 +88,12 @@ macOS 使用 CMake 创建不包含素材副本的 SDL2 开发构建。第一次�
 
 ```sh
 ./project.sh run macos-sdl2
+```
+
+Linux 的开发构建与 macOS 一致，同样直接读取仓库中的 `data/`：
+
+```sh
+./project.sh run linux-sdl2
 ```
 
 需要传递引擎选项时，直接附加到命令末尾：
@@ -156,6 +165,30 @@ HAP（sign_mode `none`），安装前必须先用你自己的材料签名：
   `tools/sign_hap_agc.ps1` 在本地签名下载到的 HAP。完整说明（包括在 AGC 注册
   bundleName 一致的应用）见 `ohos-project/README.md`。已知限制（暂无 SDL 音频后端，
   游戏暂以静音运行）也记录在该文档中。
+
+## Linux 与如意玲珑发布
+
+Linux 版本同样由 Kirikiri SDL2 引擎构建，并以如意玲珑（Linglong / linyaps）格式
+打包。仓库根目录的 `linglong.yaml` 就是玲珑构建工程：`ll-builder` 会把仓库挂载为
+容器内的 `/project`，在 `data/` 就位的前提下编译引擎、把结果安装到 `$PREFIX`，
+最终导出可离线安装的 UAB（同时支持已弃用的 layer 格式）。
+
+```sh
+python tools/fetch_data_parts.py --dest data   # 玲珑包内嵌完整游戏内容
+ll-builder build
+ll-builder export -z zstd -o Yosuga-no-Sora-HD-Remake-Linux-x86_64.uab
+sudo ll-cli install ./Yosuga-no-Sora-HD-Remake-Linux-x86_64.uab
+```
+
+`release-linux-linglong.yml` 工作流在推送 `v*-linux-*` 标签或手动触发时运行：
+compile-check 模式只安装编译依赖并验证 Linux 目标能否编译（无需下载 4 GB 素材），
+完整模式则安装玲珑构建器、下载并校验游戏数据、执行可选的无头（Xvfb）冒烟测试、
+导出 UAB / layer，并按 GitHub 单个附件小于 2 GiB 的限制发布 7-Zip 分卷。
+
+应用 ID 为 `io.github.shuimo0413.yosuganosora`，存档写入
+`$XDG_DATA_HOME/io.github.shuimo0413.yosuganosora/`（默认
+`~/.local/share/io.github.shuimo0413.yosuganosora/`），因此更新或重装应用都不会
+丢失存档。依赖、安装布局与故障排查详见 `docs/linux-linglong.md`。
 
 Kirikiri SDL2 源码使用 MIT 许可证，详见 `LICENSE`。每个二进制 Release 都随附
 `THIRD-PARTY-NOTICES.txt`（由 `tools/generate_notices.py` 生成），汇总了所有再分发

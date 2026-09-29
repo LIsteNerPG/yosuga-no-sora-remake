@@ -1,0 +1,96 @@
+# 如意玲珑（Linglong / linyaps）构建配置 —— 缘之空：高清重制 Linux 版
+#
+# 本工程以仓库根目录作为玲珑构建工程根：ll-builder 会把该目录挂载为容器内的
+# /project，因此这里不需要 sources —— 源码、子模块（external/）与游戏内容
+# （data/）全部由构建工作区直接提供，构建脚本在 /project 内调用 CMake 编译，
+# 并把产物安装到 $PREFIX（= /opt/apps/<id>/files）。
+#
+#   ll-builder build                     # 构建并提交到本地 ostree 缓存
+#   ll-builder export -z zstd -o out.uab # 导出 UAB 安装包
+#
+# base 已提供 X11/Wayland/OpenGL/ALSA/PulseAudio/DBus/udev 运行库，因此不需要
+# runtime，也不需要声明运行时 depends；SDL2、FAudio 等引擎依赖全部静态链接。
+# 详细说明见 docs/linux-linglong.md。
+
+version: "1"
+
+package:
+  id: io.github.shuimo0413.yosuganosora
+  name: yosuga-no-sora-remake
+  version: 1.0.12.0
+  kind: app
+  description: |
+    缘之空：高清重制（Yosuga no Sora: HD Remake）Linux 版。
+    由 Kirikiri SDL2 引擎驱动，内嵌完整游戏内容，支持 X11 与 Wayland、
+    OpenGL 渲染以及 ALSA/PulseAudio 音频输出。
+
+base: org.deepin.base/25.2.2
+
+# 第一个元素必须与 $PREFIX/bin 下的可执行文件一致；第二个参数是游戏数据目录，
+# 引擎会把非选项参数当作项目目录（与 .desktop 的 Exec 完全一致）。
+command:
+  - /opt/apps/io.github.shuimo0413.yosuganosora/files/bin/krkrsdl2
+  - /opt/apps/io.github.shuimo0413.yosuganosora/files/share/yosuga-no-sora-remake/data
+
+buildext:
+  apt:
+    # base 的 develop 模块只带 gcc/make/cmake/python3，SDL2 与 FAudio 在 Linux
+    # 上要探测 X11/Wayland/EGL/ALSA/PulseAudio 的头文件，因此在这里补齐。
+    build_depends:
+      - build-essential
+      - cmake
+      - ninja-build
+      - pkg-config
+      - libx11-dev
+      - libxext-dev
+      - libxrandr-dev
+      - libxcursor-dev
+      - libxi-dev
+      - libxinerama-dev
+      - libxss-dev
+      - libxkbcommon-dev
+      - libwayland-dev
+      - wayland-protocols
+      - libdecor-0-dev
+      - libegl1-mesa-dev
+      - libgl1-mesa-dev
+      - libgles2-mesa-dev
+      - libasound2-dev
+      - libpulse-dev
+      - libdbus-1-dev
+      - libudev-dev
+      - libunwind-dev
+      - libfontconfig1-dev
+
+build: |
+  set -eux
+
+  APP_VERSION="$(sed -n 's/^  version:[[:space:]]*//p' /project/linglong.yaml | head -n 1)"
+  APP_VERSION="${APP_VERSION%.0}"
+  APP_ID="$(sed -n 's/^  id:[[:space:]]*//p' /project/linglong.yaml | head -n 1)"
+  ICON_NAME="yosuganosora"
+
+  echo "building ${APP_ID} ${APP_VERSION} into ${PREFIX}"
+
+  # 数据必须存在：玲珑包内嵌完整游戏内容，缺失时应当立即失败而不是产出空包。
+  test -f /project/data/startup.tjs
+
+  cmake -S /project -B /project/build/linglong -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
+    -DOPTION_BUILD_MACOS_BUNDLE=OFF \
+    -DKRKRSDL2_GENERATE_CONTENT_MANIFEST=OFF \
+    -DKRKRSDL2_VERSION_NAME="${APP_VERSION}" \
+    -DKRKRSDL2_LINUX_APP_ID="${APP_ID}" \
+    -DKRKRSDL2_ICON_NAME="${ICON_NAME}"
+
+  cmake --build /project/build/linglong --target krkrsdl2 --parallel "$(nproc)"
+  cmake --install /project/build/linglong
+
+  # 安装结果自检：可执行文件、数据入口、desktop 与图标缺一不可。
+  test -x "${PREFIX}/bin/krkrsdl2"
+  test -f "${PREFIX}/share/yosuga-no-sora-remake/data/startup.tjs"
+  test -f "${PREFIX}/share/applications/${APP_ID}.desktop"
+  test -f "${PREFIX}/share/icons/hicolor/256x256/apps/${ICON_NAME}.png"
+
+  echo "installed: $(du -sh "${PREFIX}" | cut -f1)"

@@ -1,0 +1,23 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Yosuga no Sora: HD Remake
+Name[zh_CN]=缘之空：高清重制
+Name[zh_TW]=緣之空：高清重製
+Name[ja]=ヨスガノソラ HDリメイク
+GenericName=Visual Novel
+GenericName[zh_CN]=视觉小说
+GenericName[zh_TW]=視覺小說
+GenericName[ja]=ビジュアルノベル
+Comment=Yosuga no Sora: HD Remake powered by the Kirikiri SDL2 engine
+Comment[zh_CN]=基于 Kirikiri SDL2 引擎的《缘之空》高清重制版
+Comment[zh_TW]=基於 Kirikiri SDL2 引擎的《緣之空》高清重製版
+Comment[ja]=Kirikiri SDL2 エンジンで動作する『ヨスガノソラ』HD リメイク
+Exec=@KRKRSDL2_DESKTOP_EXEC@
+TryExec=@KRKRSDL2_DESKTOP_TRY_EXEC@
+Icon=@KRKRSDL2_ICON_NAME@
+Terminal=false
+Categories=Game;AdventureGame;
+Keywords=visual novel;galgame;yosuga no sora;
+StartupNotify=false
+StartupWMClass=krkrsdl2

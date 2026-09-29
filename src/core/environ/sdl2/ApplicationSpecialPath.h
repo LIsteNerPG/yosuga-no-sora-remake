@@ -17,6 +17,14 @@
 #include <cstdio>
 #include <cstdlib>
 
+/* The Linux desktop identity is passed in by the build system
+   (KRKRSDL2_LINUX_APP_ID in CMakeLists.txt); keeping a fallback here means a
+   build that bypasses CMake still gets a namespaced per-user save directory
+   instead of writing next to the executable. */
+#ifndef KRKRSDL2_LINUX_APP_ID
+#define KRKRSDL2_LINUX_APP_ID "yosuganosora"
+#endif
+
 #if defined(__APPLE__) && TARGET_OS_IPHONE
 extern "C" const char *TVPIOSGetDocumentsDirectory(void);
 #endif
@@ -171,6 +179,72 @@ public:
 				return path;
 			}
 		}
+		{
+			char *pref_path = SDL_GetPrefPath(NULL, "krkrsdl2");
+			std::string pref_path_utf8;
+			if (pref_path)
+			{
+				pref_path_utf8 = pref_path;
+				SDL_free(pref_path);
+				tjs_string pref_path_utf16;
+				TVPUtf8ToUtf16(pref_path_utf16, pref_path_utf8);
+				return pref_path_utf16;
+			}
+			ttstr nativeDataPath = ttstr(TVPGetAppPath().AsStdString());
+			TVPGetLocalName(nativeDataPath);
+			nativeDataPath += TJS_W("/savedata/");
+			return nativeDataPath.AsStdString();
+		}
+#elif defined(__linux__)
+		/* Linux: keep saves outside the (possibly read-only) application
+		   payload. The XDG data directory is the freedesktop standard
+		   location, and linglong maps the host's ~/.local/share into the
+		   container, so saves survive application updates and stay editable
+		   by the user. The application id namespaces the folder instead of
+		   SDL's vendor-less "krkrsdl2" one. */
+		{
+			const char *override_dir = getenv("KRKR_LINUX_SAVE_DIR");
+			std::string save_base;
+			if (override_dir && *override_dir)
+			{
+				save_base = override_dir;
+			}
+			else
+			{
+				const char *xdg_data_home = getenv("XDG_DATA_HOME");
+				if (xdg_data_home && *xdg_data_home)
+				{
+					save_base = xdg_data_home;
+				}
+				else
+				{
+					const char *home = getenv("HOME");
+					if (home && *home)
+					{
+						save_base = std::string(home) + "/.local/share";
+					}
+				}
+				if (!save_base.empty())
+				{
+					if (save_base[save_base.length() - 1] != '/')
+					{
+						save_base += '/';
+					}
+					save_base += KRKRSDL2_LINUX_APP_ID;
+				}
+			}
+			tjs_string save_path;
+			if (!save_base.empty() && TVPUtf8ToUtf16(save_path, save_base))
+			{
+				if (save_path.length() > 0 && save_path[save_path.length() - 1] != TJS_W('/'))
+				{
+					save_path += TJS_W('/');
+				}
+				return save_path;
+			}
+		}
+		/* Fallbacks: SDL's preference path, then the executable directory for
+		   portable development builds. */
 		{
 			char *pref_path = SDL_GetPrefPath(NULL, "krkrsdl2");
 			std::string pref_path_utf8;
