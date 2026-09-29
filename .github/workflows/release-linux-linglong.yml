@@ -55,7 +55,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.workflow }}-${{ github.ref }}
+  # Every dispatch must be independent: keying on github.ref collapsed two
+  # manual dispatches into one group, so a second dispatch cancelled the first
+  # while it was still building (that is how linux-16 died). Keying on the
+  # release tag did not help either - inputs is not evaluated in this position,
+  # so the tag part was always empty. github.run_id is unique per run, and a
+  # release build is a one-shot job that does not need serialising anyway.
+  group: release-${{ github.workflow }}-${{ github.run_id }}
   cancel-in-progress: false
 
 env:
