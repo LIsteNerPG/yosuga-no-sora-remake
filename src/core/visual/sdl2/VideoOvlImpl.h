@@ -108,7 +108,7 @@ public:
 	 * movie; turns that into the onStatusChanged("stop") the TJS layer needs. */
 	void LinuxPlaybackFinished();
 	/* Render-thread accessors used by TVPLinuxVideo* in LinuxVideoPlayer.h. */
-	bool LinuxAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height);
+	bool LinuxAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height, bool *is_new);
 	void LinuxReleaseFrame();
 	bool LinuxIsFinished() const;
 #endif

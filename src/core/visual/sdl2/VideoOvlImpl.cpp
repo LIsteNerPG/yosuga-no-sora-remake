@@ -2087,12 +2087,12 @@ tTJSNativeClass * TVPCreateNativeClass_VideoOverlay()
  * onStatusChanged TJS event inline, so the render loop polls for the end of
  * the movie once per frame instead of the decoder thread calling back.
  * ------------------------------------------------------------------------- */
-bool tTJSNI_VideoOverlay::LinuxAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height)
+bool tTJSNI_VideoOverlay::LinuxAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height, bool *is_new)
 {
 	if(!LinuxPlayer) return false;
 	const uint8_t *data = nullptr;
 	int line_size = 0;
-	if(!LinuxPlayer->AcquireFrame(&data, &line_size)) return false;
+	if(!LinuxPlayer->AcquireFrame(&data, &line_size, is_new)) return false;
 	*pixels = data;
 	*pitch = line_size;
 	*width = LinuxPlayer->Width();
@@ -2124,10 +2124,10 @@ bool TVPLinuxVideoIsActive()
 	return LinuxVideoActiveOverlay != nullptr;
 }
 //---------------------------------------------------------------------------
-bool TVPLinuxVideoAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height)
+bool TVPLinuxVideoAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height, bool *is_new)
 {
 	if(!LinuxVideoActiveOverlay) return false;
-	return LinuxVideoActiveOverlay->LinuxAcquireFrame(pixels, pitch, width, height);
+	return LinuxVideoActiveOverlay->LinuxAcquireFrame(pixels, pitch, width, height, is_new);
 }
 //---------------------------------------------------------------------------
 void TVPLinuxVideoReleaseFrame()

@@ -59,11 +59,14 @@ public:
 	double Duration() const { return duration_; }
 	double Position() const;
 
-	/* Render thread side: returns the newest decoded frame as tightly packed
-	 * BGRA rows (matching SDL_PIXELFORMAT_ARGB8888 on little-endian hosts).
-	 * Returns false when no frame is pending; ReleaseFrame() must be called
-	 * after the frame has been uploaded to a texture. */
-	bool AcquireFrame(const uint8_t **pixels, int *pitch);
+	/* Render thread side: returns the current frame as tightly packed BGRA rows
+	 * (matching SDL_PIXELFORMAT_ARGB8888 on little-endian hosts). The frame
+	 * stays available until the next one is decoded, so a render loop running
+	 * faster than the decoder keeps showing the same picture instead of
+	 * falling back to something else in between. `is_new` (optional) is set
+	 * when this frame has not been presented yet. Returns false only before
+	 * the first frame or after ResetPlaybackState(). */
+	bool AcquireFrame(const uint8_t **pixels, int *pitch, bool *is_new = nullptr);
 	void ReleaseFrame();
 
 	bool IsFinished() const { return finished_.load(); }
@@ -110,6 +113,9 @@ private:
 	std::mutex frame_mutex_;
 	std::vector<uint8_t> frame_buffer_[2];
 	int front_buffer_;
+	/* frame_valid_ survives ReleaseFrame(); frame_ready_ marks "not presented
+	 * yet" and is what keeps the renderer from re-blitting an unchanged frame. */
+	bool frame_valid_;
 	bool frame_ready_;
 
 	SDL_AudioDeviceID audio_device_;
@@ -130,7 +136,9 @@ private:
  * four entry points. They are no-ops when no movie is playing.
  * ------------------------------------------------------------------------- */
 bool TVPLinuxVideoIsActive();
-bool TVPLinuxVideoAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height);
+/* `is_new` reports whether this frame has not been presented yet; the loop
+ * uses it to skip re-uploading an unchanged picture. */
+bool TVPLinuxVideoAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height, bool *is_new);
 void TVPLinuxVideoReleaseFrame();
 /* Returns true once per playback when the movie reached its end; the overlay
  * has already been switched to the "stop" status at that point, which is what

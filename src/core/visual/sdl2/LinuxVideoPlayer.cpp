@@ -44,6 +44,7 @@ TVPLinuxVideoPlayer::TVPLinuxVideoPlayer()
 	, clock_base_(0.0)
 	, position_(0.0)
 	, front_buffer_(0)
+	, frame_valid_(false)
 	, frame_ready_(false)
 	, audio_device_(0)
 	, volume_(1.0f)
@@ -77,6 +78,7 @@ void TVPLinuxVideoPlayer::ResetPlaybackState()
 {
 	std::lock_guard<std::mutex> lock(frame_mutex_);
 	front_buffer_ = 0;
+	frame_valid_ = false;
 	frame_ready_ = false;
 	position_.store(0.0);
 }
@@ -297,10 +299,14 @@ double TVPLinuxVideoPlayer::Position() const
 	return position_.load();
 }
 
-bool TVPLinuxVideoPlayer::AcquireFrame(const uint8_t **pixels, int *pitch)
+bool TVPLinuxVideoPlayer::AcquireFrame(const uint8_t **pixels, int *pitch, bool *is_new)
 {
 	std::lock_guard<std::mutex> lock(frame_mutex_);
-	if (!frame_ready_)
+	if (is_new)
+	{
+		*is_new = false;
+	}
+	if (!frame_valid_)
 	{
 		return false;
 	}
@@ -311,11 +317,19 @@ bool TVPLinuxVideoPlayer::AcquireFrame(const uint8_t **pixels, int *pitch)
 	}
 	*pixels = buffer.data();
 	*pitch = width_ * 4;
+	if (is_new)
+	{
+		*is_new = frame_ready_;
+	}
 	return true;
 }
 
 void TVPLinuxVideoPlayer::ReleaseFrame()
 {
+	/* Only marks the frame as presented - it stays valid (and keeps being
+	 * handed out) until the next one is decoded. Clearing the availability
+	 * here instead made the render loop fall back to the engine picture
+	 * between two decoded frames, which the user saw as flicker. */
 	std::lock_guard<std::mutex> lock(frame_mutex_);
 	frame_ready_ = false;
 }
@@ -553,6 +567,7 @@ void TVPLinuxVideoPlayer::PublishFrame(AVFrame *frame, double &first_pts)
 	{
 		std::lock_guard<std::mutex> lock(frame_mutex_);
 		front_buffer_ = back;
+		frame_valid_ = true;
 		frame_ready_ = true;
 	}
 	position_.store(relative);

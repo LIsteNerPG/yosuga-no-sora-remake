@@ -1331,6 +1331,26 @@ void TVPWindowWindow::UpdateMacOSBackingScale()
 
 void TVPWindowWindow::TranslateWindowToDrawArea(int &x, int &y)
 {
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__)
+	/* Linux presents through the window surface: TickBeat scales the engine's
+	 * own surface into it with SDL_BlitScaled, so the picture fills the whole
+	 * window and window coordinates have to be scaled back into engine
+	 * coordinates. Without this, choosing a smaller resolution in windowed
+	 * mode rescaled the picture while every click stayed at its old position
+	 * (the buttons looked right but were not where they were drawn). */
+	if (this->window && this->surface && this->surface->w > 0 && this->surface->h > 0)
+	{
+		int window_w = 0;
+		int window_h = 0;
+		SDL_GetWindowSize(this->window, &window_w, &window_h);
+		if (window_w > 0 && window_h > 0 &&
+			(window_w != this->surface->w || window_h != this->surface->h))
+		{
+			x = MulDiv(x, this->surface->w, window_w);
+			y = MulDiv(y, this->surface->h, window_h);
+		}
+	}
+#endif
 #ifdef KRKRSDL2_ENABLE_ZOOM
 #ifdef KRKRZ_ENABLE_CANVAS
 	if (this->context)
@@ -2135,7 +2155,8 @@ void TVPWindowWindow::TickBeat()
 		int video_pitch = 0;
 		int video_width = 0;
 		int video_height = 0;
-		if (TVPLinuxVideoAcquireFrame(&video_pixels, &video_pitch, &video_width, &video_height))
+		bool video_is_new = false;
+		if (TVPLinuxVideoAcquireFrame(&video_pixels, &video_pitch, &video_width, &video_height, &video_is_new))
 		{
 			if (this->renderer)
 			{
@@ -2165,11 +2186,14 @@ void TVPWindowWindow::TickBeat()
 					this->hasDrawn = true;
 				}
 			}
-			else if (this->window)
+			else if (this->window && video_is_new)
 			{
 				/* No renderer: wrap the decoded frame in a surface and scale it
 				 * into the window surface, mirroring the engine-picture path
-				 * further down. */
+				 * further down. Only a freshly decoded frame is uploaded - the
+				 * window surface keeps its contents between uploads, and
+				 * re-blitting an unchanged 1920x1080 picture every iteration
+				 * would just burn CPU on a software-rendered host. */
 				SDL_Surface *window_surface = SDL_GetWindowSurface(this->window);
 				if (window_surface)
 				{
