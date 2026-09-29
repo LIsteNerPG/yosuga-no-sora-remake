@@ -1044,7 +1044,7 @@ TVPWindowWindow::TVPWindowWindow(tTJSNI_Window *w)
 #endif
 	{
 #if !defined(__EMSCRIPTEN__) || (defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__))
-#if defined(__ANDROID__) || defined(__OHOS__) || defined(__APPLE__) || defined(__linux__)
+#if defined(__ANDROID__) || defined(__OHOS__) || defined(__APPLE__)
 		/* Mobile platforms, macOS and Linux: prefer the hardware renderer -
 		 * GLES2 on Android/OHOS, Metal on Apple platforms (Apple deprecated
 		 * OpenGL ES and SDL2 removed its iOS GLES backend). These platforms
@@ -1056,13 +1056,11 @@ TVPWindowWindow::TVPWindowWindow(tTJSNI_Window *w)
 		 * to software. The software renderer paints through the LockBuffer
 		 * path and TickBeat pauses whichever renderer is active while the
 		 * AVPlayer owns the surface.
-		 * Linux was previously left out of this list, which forced it onto
-		 * the raw window-surface path: the picture was memcpy'd 1:1 into the
-		 * window surface with no scaling at all, so choosing a smaller
-		 * resolution in the settings menu shrank the window while the
-		 * 1920x1080 layer stayed unscaled and got clipped. On a host without
-		 * hardware GL both attempts fail and the code falls back to the
-		 * window-surface path anyway, so this stays a safe degradation. */
+		 * Linux deliberately stays out of this list: on a host without
+		 * hardware GL (a virtual machine, for instance) an SDL renderer here
+		 * produced a window that never received a single frame, so Linux keeps
+		 * the plain window-surface path and gets its scaling from a software
+		 * blit in TickBeat instead. */
 		this->renderer = SDL_CreateRenderer(this->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 		if (!this->renderer)
 		{
@@ -1082,30 +1080,15 @@ TVPWindowWindow::TVPWindowWindow(tTJSNI_Window *w)
 #endif
 
 		this->bitmapCompletion = new TVPSDLBitmapCompletion();
-		if (!this->renderer)
-		{
-			/* Renderer-less fallback (neither the accelerated nor the software
-			 * renderer could be created): the engine paints directly into the
-			 * window surface through SDL_LockSurface + memcpy in
-			 * TVPSDLBitmapCompletion, so hand that surface over and keep it
-			 * valid across resizes (see TickBeat).
-			 * When a renderer DOES exist, this->surface must stay the engine's
-			 * own RGB surface, which SetPaintBoxSize allocates: assigning the
-			 * window surface here made every SDL_UpdateTexture upload the
-			 * engine-untouched (black) window framebuffer instead of the game
-			 * picture. Freeing it in SetPaintBoxSize would additionally leave
-			 * SDL's own window->surface dangling. */
-			this->surface = SDL_GetWindowSurface(this->window);
-			if (!this->surface)
-			{
-				TVPAddLog(ttstr("Cannot get surface from SDL window: ") + ttstr(SDL_GetError()));
-			}
-			this->bitmapCompletion->surface = this->surface;
-		}
-		if (!this->renderer && !this->surface)
-		{
-			TVPThrowExceptionMessage(TJS_W("Cannot get surface or renderer from SDL window"));
-		}
+		/* The engine always paints into its own RGB surface, which
+		 * SetPaintBoxSize allocates for every platform. TickBeat then either
+		 * uploads it into the renderer texture (platforms with a renderer) or
+		 * scales it into the window surface (Linux, see the software blit
+		 * there). Taking the window surface here instead made
+		 * SDL_UpdateTexture upload the untouched window framebuffer - a black
+		 * picture - and freeing it later left SDL's own window->surface
+		 * dangling. */
+		this->surface = nullptr;
 		this->texture = nullptr;
 		if (this->renderer)
 		{
@@ -1220,6 +1203,14 @@ void TVPWindowWindow::SetPaintBoxSize(tjs_int w, tjs_int h)
 			SDL_SetTextureScaleMode(this->texture, TVPGetTextureScaleMode());
 		}
 #endif
+	}
+
+	/* The engine's own drawing surface. It exists regardless of the renderer:
+	 * platforms that have one upload it into the texture above, Linux scales
+	 * it into the window surface in TickBeat. Creating it only when a renderer
+	 * was present is what made a smaller window clip a 1920x1080 picture
+	 * instead of scaling it. */
+	{
 		this->bitmapCompletion->surface = nullptr;
 		if (this->surface)
 		{
@@ -2104,7 +2095,7 @@ void TVPWindowWindow::TickBeat()
 	 * publishes finished frames through the player owned by
 	 * tTJSNI_VideoOverlay, so the picture is uploaded and presented here and
 	 * the engine's own frame is skipped for as long as the movie lasts. */
-	if (this->renderer && TVPLinuxVideoIsActive())
+	if (TVPLinuxVideoIsActive())
 	{
 		const uint8_t *video_pixels = nullptr;
 		int video_pitch = 0;
@@ -2112,30 +2103,58 @@ void TVPWindowWindow::TickBeat()
 		int video_height = 0;
 		if (TVPLinuxVideoAcquireFrame(&video_pixels, &video_pitch, &video_width, &video_height))
 		{
-			if (this->videoTexture == nullptr ||
-				this->videoTextureWidth != video_width ||
-				this->videoTextureHeight != video_height)
+			if (this->renderer)
 			{
+				if (this->videoTexture == nullptr ||
+					this->videoTextureWidth != video_width ||
+					this->videoTextureHeight != video_height)
+				{
+					if (this->videoTexture)
+					{
+						SDL_DestroyTexture(this->videoTexture);
+						this->videoTexture = nullptr;
+					}
+					/* BGRA rows from FFmpeg match ARGB8888 in little-endian memory. */
+					this->videoTexture = SDL_CreateTexture(this->renderer, SDL_PIXELFORMAT_ARGB8888,
+						SDL_TEXTUREACCESS_STREAMING, video_width, video_height);
+					this->videoTextureWidth = video_width;
+					this->videoTextureHeight = video_height;
+				}
 				if (this->videoTexture)
 				{
-					SDL_DestroyTexture(this->videoTexture);
-					this->videoTexture = nullptr;
+					SDL_UpdateTexture(this->videoTexture, nullptr, video_pixels, video_pitch);
+					/* The renderer's logical size is the game resolution, so this
+					 * scales (and letterboxes) the movie like any other frame. */
+					SDL_RenderClear(this->renderer);
+					SDL_RenderCopy(this->renderer, this->videoTexture, nullptr, nullptr);
+					SDL_RenderPresent(this->renderer);
+					this->hasDrawn = true;
 				}
-				/* BGRA rows from FFmpeg match ARGB8888 in little-endian memory. */
-				this->videoTexture = SDL_CreateTexture(this->renderer, SDL_PIXELFORMAT_ARGB8888,
-					SDL_TEXTUREACCESS_STREAMING, video_width, video_height);
-				this->videoTextureWidth = video_width;
-				this->videoTextureHeight = video_height;
 			}
-			if (this->videoTexture)
+			else if (this->window)
 			{
-				SDL_UpdateTexture(this->videoTexture, nullptr, video_pixels, video_pitch);
-				/* The renderer has a logical size of the game resolution, so
-				 * this scales (and letterboxes) the movie like any other frame. */
-				SDL_RenderClear(this->renderer);
-				SDL_RenderCopy(this->renderer, this->videoTexture, nullptr, nullptr);
-				SDL_RenderPresent(this->renderer);
-				this->hasDrawn = true;
+				/* No renderer: wrap the decoded frame in a surface and scale it
+				 * into the window surface, mirroring the engine-picture path
+				 * further down. */
+				SDL_Surface *window_surface = SDL_GetWindowSurface(this->window);
+				if (window_surface)
+				{
+					SDL_Surface *frame_surface = SDL_CreateRGBSurfaceFrom(
+						(void *)video_pixels, video_width, video_height, 32, video_pitch,
+						0x00ff0000, 0x0000ff00, 0x000000ff, 0);
+					if (frame_surface)
+					{
+						SDL_BlitScaled(frame_surface, nullptr, window_surface, nullptr);
+						SDL_FreeSurface(frame_surface);
+					}
+					SDL_Rect full;
+					full.x = 0;
+					full.y = 0;
+					full.w = window_surface->w;
+					full.h = window_surface->h;
+					SDL_UpdateWindowSurfaceRects(this->window, &full, 1);
+					this->hasDrawn = true;
+				}
 			}
 			TVPLinuxVideoReleaseFrame();
 		}
@@ -2193,33 +2212,6 @@ void TVPWindowWindow::TickBeat()
 		 * no-ops when it is stale, so the software-rendered frame would
 		 * never reach the screen. */
 		SDL_GetWindowSurface(this->window);
-	}
-#endif
-#if defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__)
-	/* Linux never creates an SDL_Renderer (see the renderer creation in the
-	 * constructor), so the engine paints straight into the surface returned
-	 * by SDL_GetWindowSurface() and TVPSDLBitmapCompletion memcpy's every
-	 * completed bitmap into it. Any window resize invalidates that surface -
-	 * and the game always performs one, because Window.tjs switches to
-	 * SDL_WINDOW_FULLSCREEN_DESKTOP right after start (CONFIG.fullScreen
-	 * defaults to 1). SDL_UpdateWindowSurfaceRects then silently no-ops while
-	 * the engine keeps writing into the stale surface, so the window shows
-	 * its decorations with no content at all.
-	 * Re-acquire the surface and republish the pointer to both owners. The
-	 * OHOS branch above deliberately must NOT do this (it has a renderer and
-	 * this->surface is the engine's own bitmap there), which is why Linux
-	 * needs its own branch. */
-	if (this->window && !this->renderer)
-	{
-		SDL_Surface *window_surface = SDL_GetWindowSurface(this->window);
-		if (window_surface && window_surface != this->surface)
-		{
-			this->surface = window_surface;
-			if (this->bitmapCompletion)
-			{
-				this->bitmapCompletion->surface = window_surface;
-			}
-		}
 	}
 #endif
 	if (this->needsGraphicUpdate)
@@ -2302,6 +2294,15 @@ void TVPWindowWindow::TickBeat()
 			}
 			else if (this->window && this->surface)
 			{
+				/* No renderer (the Linux software path): scale the engine's own
+				 * drawing surface into the window surface, so a smaller window
+				 * shows a scaled-down picture instead of clipping a 1920x1080
+				 * one. This is what makes the resolution setting work. */
+				SDL_Surface *window_surface = SDL_GetWindowSurface(this->window);
+				if (window_surface != nullptr && window_surface != this->surface)
+				{
+					SDL_BlitScaled(this->surface, nullptr, window_surface, nullptr);
+				}
 				SDL_UpdateWindowSurfaceRects(this->window, &rect, 1);
 				this->hasDrawn = true;
 			}

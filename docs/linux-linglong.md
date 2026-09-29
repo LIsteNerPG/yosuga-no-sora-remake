@@ -150,6 +150,15 @@ UAB 文件通常在 2.5–3.5 GB 之间，超过 GitHub Release 单文件 2 GiB 
 
 手动触发时可以选择导出格式（`both`/`uab`/`layer`）以及是否运行冒烟测试。
 
+## 渲染与缩放
+
+Linux 不使用 `SDL_Renderer`：在没有硬件 GL 的环境（虚拟机就是典型）里，
+创建出来的渲染器会让窗口一帧都收不到内容（CI 的截图判空会直接抓到这种
+情况）。引擎改为把画面画进自己的 RGB 表面（由 `SetPaintBoxSize` 创建），
+`TickBeat` 每帧用 `SDL_BlitScaled` 把它缩放到窗口表面后再上传——因此在游戏
+设置里调小分辨率时，窗口缩小的同时画面会等比缩放，而不会把 1920x1080 的
+画面裁掉一块。
+
 ## 视频播放
 
 Linux 没有原生视频叠加层（Windows 用 DirectShow、macOS/iOS 与 OHOS 用
@@ -160,8 +169,7 @@ AVPlayer、Android 用 MediaPlayer），因此 `Movie.tjs` 里为其余平台预
   解封装并解码：视频经 `swscale` 转成 BGRA，音频经 `swresample` 转成 S16
   交给 SDL 音频设备；画面按 PTS 与挂钟对齐，音频由设备按自身节奏消费；
 - 解码好的帧由 [SDLApplication.cpp](src/core/sdl2/SDLApplication.cpp) 的
-  `TickBeat` 上传成纹理并整窗呈现。渲染器已设置逻辑尺寸为游戏分辨率，
-  所以影片同样会被 letterbox 缩放，不会像早期的窗口表面路径那样被裁切；
+  `TickBeat` 缩放后写入窗口表面，与引擎画面走同一条软件路径；
 - 播放结束由主线程轮询转成 `onStatusChanged("stop")` —— 与其它平台的原生
   播放器满足同一个契约，`Movie.tjs` 的相位机因此能正常推进。
 
