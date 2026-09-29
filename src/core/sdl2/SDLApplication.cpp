@@ -1027,31 +1027,11 @@ TVPWindowWindow::TVPWindowWindow(tTJSNI_Window *w)
 			(unsigned)SDL_GetWindowFlags(this->window),
 			new_window_w, new_window_h,
 			SDL_GetWindowTitle(this->window) ? SDL_GetWindowTitle(this->window) : "(null)");
-		/* The X11 window id ties this window to one specific X server. Printing
-		 * it lets the smoke test ask both the host and the container which of
-		 * them can see that id, which settles whether ll-builder's container
-		 * really shares the display we screenshot. */
-#if defined(__linux__)
-		SDL_SysWMinfo wm_info;
-		SDL_VERSION(&wm_info.version);
-		if (SDL_GetWindowWMInfo(this->window, &wm_info))
-		{
-			if (wm_info.subsystem == SDL_SYSWM_X11)
-			{
-				SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "VIDWINDOW x11 id=0x%lx",
-					(unsigned long)wm_info.info.x11.window);
-			}
-			else
-			{
-				SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "VIDWINDOW subsystem=%d (not X11)",
-					(int)wm_info.subsystem);
-			}
-		}
-		else
-		{
-			SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "VIDWINDOW no window manager info: %s", SDL_GetError());
-		}
-#endif
+		/* NOTE: SDL_GetWindowWMInfo cannot be used here - this SDL build ships
+		 * no syswm backend at all, so SDL_SysWMinfo / SDL_SYSWM_X11 are not
+		 * even declared (it failed to compile with "SDL_SysWMinfo was not
+		 * declared in this scope"). The video driver plus DISPLAY above are
+		 * enough to tell that the window is created on a real X server. */
 	}
 #if defined(__EMSCRIPTEN__) && defined(KRKRSDL2_WINDOW_SIZE_IS_LAYER_SIZE)
 	EmscriptenFullscreenStrategy strategy;
