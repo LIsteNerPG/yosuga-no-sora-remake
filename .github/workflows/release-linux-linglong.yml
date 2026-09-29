@@ -26,12 +26,20 @@ name: Release Linux Linglong
       export_format:
         description: 'Package format to export (UAB is the recommended, current format)'
         required: true
-        default: both
+        default: uab
         type: choice
         options:
-          - both
           - uab
+          - both
           - layer
+      compressor:
+        description: 'erofs compressor for the exported image: lz4 is fast, zstd is ~10x slower but a few percent smaller'
+        required: true
+        default: lz4
+        type: choice
+        options:
+          - lz4
+          - zstd
       smoke_test:
         description: 'Run the headless (Xvfb) smoke test after the build'
         required: true
@@ -93,13 +101,15 @@ jobs:
           INPUT_PRERELEASE: ${{ inputs.prerelease }}
           INPUT_MODE: ${{ inputs.mode }}
           INPUT_EXPORT_FORMAT: ${{ inputs.export_format }}
+          INPUT_COMPRESSOR: ${{ inputs.compressor }}
           INPUT_SMOKE_TEST: ${{ inputs.smoke_test }}
           INPUT_PUBLISH: ${{ inputs.publish }}
         run: |
           set -euo pipefail
           publish=true
           mode="${INPUT_MODE:-full}"
-          export_format="${INPUT_EXPORT_FORMAT:-both}"
+          export_format="${INPUT_EXPORT_FORMAT:-uab}"
+          compressor="${INPUT_COMPRESSOR:-lz4}"
           smoke_test="${INPUT_SMOKE_TEST:-true}"
           if [[ "$EVENT_NAME" == 'push' && "$GITHUB_REF" == refs/tags/* ]]; then
             release_tag="$REF_NAME"
@@ -140,6 +150,7 @@ jobs:
             echo "build-number=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))"
             echo "mode=$mode"
             echo "export-format=$export_format"
+            echo "compressor=$compressor"
             echo "smoke-test=$smoke_test"
             echo "prerelease=$is_prerelease"
             echo "publish=$publish"
@@ -329,6 +340,7 @@ jobs:
         shell: bash
         env:
           EXPORT_FORMAT: ${{ steps.release.outputs.export-format }}
+          COMPRESSOR: ${{ steps.release.outputs.compressor }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
@@ -341,7 +353,13 @@ jobs:
             # --uabx" (exit 107). The launcher icon is already inside the
             # package ($PREFIX/share/icons/hicolor), which is what the desktop
             # entry uses; the UAB file icon is cosmetic by comparison.
-            ll-builder export -z zstd \
+            #
+            # -z selects the erofs compressor used by mkfs.erofs. zstd is the
+            # experimental single-threaded path in erofs ("Therefore it will
+            # takes more time in order to get the optimal result") and took
+            # ~14 minutes for this 4 GiB payload; lz4 does it in minutes for a
+            # few percent more size, and the assets are already compressed.
+            ll-builder export -z "$COMPRESSOR" \
               -o "$asset_dir/Yosuga-no-Sora-HD-Remake-Linux-$arch-$RELEASE_TAG.uab"
           fi
           if [[ "$EXPORT_FORMAT" == 'layer' || "$EXPORT_FORMAT" == 'both' ]]; then
