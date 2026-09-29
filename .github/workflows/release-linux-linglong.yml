@@ -156,14 +156,18 @@ jobs:
             echo "publish=$publish"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Cache the linglong builder packages
+      # The .deb files are cached through a workspace directory rather than
+      # /var/cache/apt/archives, and saved explicitly right after the install
+      # instead of at the end of the job: a run that fails later (a compile
+      # error, a smoke test) never reached the implicit post-job save, so the
+      # cache stayed empty and every attempt had to reach ci.deepin.com again.
+      - name: Restore cached linglong builder packages
         if: steps.release.outputs.mode == 'full'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: deb-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: /var/cache/apt/archives
-          key: linux-linglong-apt-v1-${{ runner.os }}-${{ hashFiles('linglong.yaml') }}
-          restore-keys: |
-            linux-linglong-apt-v1-
+          path: ${{ github.workspace }}/.linglong-debs
+          key: linux-linglong-debs-v1
 
       - name: Install the linglong builder
         if: steps.release.outputs.mode == 'full'
@@ -175,16 +179,45 @@ jobs:
           echo 'deb [trusted=yes] https://ci.deepin.com/repo/obs/linglong:/CI:/release/Ubuntu_24.04/ ./' \
             | sudo tee /etc/apt/sources.list.d/linglong.list
           sudo apt-get update
+          # Reuse what an earlier run downloaded: ci.deepin.com is only
+          # reachable over a long haul from GitHub's runners, and a single
+          # timed-out fetch used to kill the entire build with
+          # "Could not connect to ci.deepin.com:443" / "stage pull dependency
+          # error" before anything was compiled.
+          mkdir -p "$GITHUB_WORKSPACE/.linglong-debs"
+          sudo cp -n "$GITHUB_WORKSPACE/.linglong-debs/"*.deb /var/cache/apt/archives/ 2>/dev/null || true
           # linglong-box owns the 'll-box' container helper. linglong-bin only
           # lists it as one alternative of "linglong-box | crun", so apt is
           # free to install crun instead and 'll-builder build' then dies with
           # "ll-box not found" (exit 255). Install it explicitly.
-          sudo apt-get install -y --no-install-recommends \
-            linglong-bin linglong-builder linglong-box
+          installed=0
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get install -y --no-install-recommends \
+                 linglong-bin linglong-builder linglong-box; then
+              installed=1
+              break
+            fi
+            echo "::warning::apt-get install failed on attempt ${attempt}; retrying in 20s"
+            sleep 20
+          done
+          if [[ "$installed" != "1" ]]; then
+            echo "could not install the linglong builder after 5 attempts"
+            exit 1
+          fi
+          command -v ll-builder >/dev/null
+          sudo cp -n /var/cache/apt/archives/*.deb "$GITHUB_WORKSPACE/.linglong-debs/" 2>/dev/null || true
           ll-cli --version || true
           ll-builder --version || true
           command -v ll-box || ls -l /usr/libexec/linglong/ll-box /usr/lib/linglong/ll-box 2>/dev/null || true
-          sudo du -sh /var/cache/apt/archives 2>/dev/null || true
+          du -sh "$GITHUB_WORKSPACE/.linglong-debs" /var/cache/apt/archives 2>/dev/null || true
+
+      - name: Save cached linglong builder packages
+        if: steps.release.outputs.mode == 'full' && steps.deb-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ github.workspace }}/.linglong-debs
+          key: linux-linglong-debs-v1
 
       - name: Allow unprivileged user namespaces
         if: steps.release.outputs.mode == 'full'
