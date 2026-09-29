@@ -174,10 +174,27 @@ jobs:
       - name: Download the game data from the source release
         if: steps.release.outputs.mode == 'full'
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Optional repository variable: point it at another owner/repo (for
+          # example a mirror) to override the automatic data source lookup.
+          DATA_REPOSITORY: ${{ vars.DATA_REPOSITORY }}
         run: |
           set -euo pipefail
           rm -rf data
-          python3 tools/fetch_data_parts.py --dest data
+          # The data-vN source releases live in the main repository, so a fork
+          # running this workflow has none of its own: probe the current
+          # repository first and fall back to the main one when it is empty.
+          # DATA_REPOSITORY overrides both branches.
+          data_repo="${DATA_REPOSITORY:-$GITHUB_REPOSITORY}"
+          if [[ -z "${DATA_REPOSITORY:-}" ]] &&
+             ! gh release list --repo "$GITHUB_REPOSITORY" --limit 100 2>/dev/null \
+               | grep -q '^data-v'; then
+            data_repo="shuimo0413/yosuga-no-sora-remake"
+            echo "No data-vN release in $GITHUB_REPOSITORY; using $data_repo instead."
+          fi
+          echo "data source repository: $data_repo"
+          python3 tools/fetch_data_parts.py --dest data --repo "$data_repo"
 
       - name: Inject the game version into status.tjs
         if: steps.release.outputs.mode == 'full'
