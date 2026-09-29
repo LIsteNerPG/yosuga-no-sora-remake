@@ -68,6 +68,10 @@ buildext:
 build: |
   set -eux
 
+  # ccache 的工作目录必须落在 /project 下：玲珑容器里的 $HOME 不保证映射到
+  # 宿主机，之前的 ~/.cache/ccache 在 CI 上根本不存在，缓存步骤会保存失败。
+  export CCACHE_DIR=/project/.ccache
+
   APP_VERSION="$(sed -n 's/^  version:[[:space:]]*//p' /project/linglong.yaml | head -n 1)"
   APP_VERSION="${APP_VERSION%.0}"
   APP_ID="$(sed -n 's/^  id:[[:space:]]*//p' /project/linglong.yaml | head -n 1)"

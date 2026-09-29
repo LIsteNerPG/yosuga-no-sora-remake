@@ -273,7 +273,9 @@ jobs:
         if: steps.release.outputs.mode == 'full'
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ~/.cache/ccache
+          # linglong.yaml exports CCACHE_DIR=/project/.ccache inside the build
+          # container, and /project is this checkout.
+          path: ${{ github.workspace }}/.ccache
           key: linux-linglong-ccache-v1-${{ github.sha }}
           restore-keys: |
             linux-linglong-ccache-v1-
@@ -297,7 +299,7 @@ jobs:
         continue-on-error: true
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ~/.cache/ccache
+          path: ${{ github.workspace }}/.ccache
           key: linux-linglong-ccache-v1-${{ github.sha }}
 
       - name: Headless smoke test
@@ -335,7 +337,11 @@ jobs:
           icon="src/resources/linux/icons/hicolor/256x256/apps/yosuganosora.png"
           arch="$(uname -m)"
           if [[ "$EXPORT_FORMAT" == 'uab' || "$EXPORT_FORMAT" == 'both' ]]; then
-            ll-builder export -z zstd --icon "$icon" \
+            # No --icon here: linglong 1.14 rejects it with "--icon requires
+            # --uabx" (exit 107). The launcher icon is already inside the
+            # package ($PREFIX/share/icons/hicolor), which is what the desktop
+            # entry uses; the UAB file icon is cosmetic by comparison.
+            ll-builder export -z zstd \
               -o "$asset_dir/Yosuga-no-Sora-HD-Remake-Linux-$arch-$RELEASE_TAG.uab"
           fi
           if [[ "$EXPORT_FORMAT" == 'layer' || "$EXPORT_FORMAT" == 'both' ]]; then

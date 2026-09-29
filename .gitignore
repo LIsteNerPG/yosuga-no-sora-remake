@@ -11,6 +11,9 @@
 
 /build/
 /build-*/
+
+# ccache directory of the linglong build (CCACHE_DIR=/project/.ccache)
+/.ccache/
 /build_*/
 **/build/
 .externalNativeBuild/
