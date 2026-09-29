@@ -55,6 +55,21 @@ else
   echo 'll-cli 未安装'
 fi
 
+section "安装位置与用户数据"
+if have ll-cli; then
+  echo '--- ll-cli content（导出到系统的文件） ---'
+  ll-cli content "$APP_ID" 2>/dev/null | head -n 20
+  echo '--- ll-cli info ---'
+  ll-cli info "$APP_ID" 2>/dev/null | head -n 30
+  echo '--- 用户级数据根 ~/.linglong ---'
+  ls -la "$HOME/.linglong" 2>/dev/null | head -n 20
+  ls -la "$HOME/.linglong/$APP_ID" 2>/dev/null
+  echo '--- 容器内的 XDG 重定向 ---'
+  ll-cli run "$APP_ID" -- /bin/sh -c 'env | grep -E "^XDG_(DATA|CONFIG|CACHE|STATE)_HOME|^HOME=|^LINGLONG" | sort' 2>&1 | head -n 20
+fi
+echo '--- 本项目 XDG 存档目录（宿主机路径，非玲珑环境） ---'
+ls -la "$HOME/.local/share/$APP_ID" 2>/dev/null || echo '（尚未创建）'
+
 section "容器内自检"
 if have ll-cli; then
   ll-cli run "$APP_ID" -- /bin/sh -c "
