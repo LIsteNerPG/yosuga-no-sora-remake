@@ -1014,6 +1014,20 @@ TVPWindowWindow::TVPWindowWindow(tTJSNI_Window *w)
 	{
 		TVPThrowExceptionMessage(TJS_W("Cannot create SDL window: %1"), ttstr(SDL_GetError()));
 	}
+	/* Which video backend actually got used? A window that SDL creates through
+	 * the dummy/offscreen driver renders perfectly into memory while nothing
+	 * ever appears on the X server the launcher is watching - exactly the
+	 * "engine draws, screenshot is black" pattern seen in CI. */
+	{
+		const char *video_driver = SDL_GetCurrentVideoDriver();
+		const char *display = SDL_getenv("DISPLAY");
+		SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "VIDWINDOW driver=%s display=%s flags=0x%x size=%dx%d title=%s",
+			video_driver ? video_driver : "(null)",
+			display ? display : "(unset)",
+			(unsigned)SDL_GetWindowFlags(this->window),
+			new_window_w, new_window_h,
+			SDL_GetWindowTitle(this->window) ? SDL_GetWindowTitle(this->window) : "(null)");
+	}
 #if defined(__EMSCRIPTEN__) && defined(KRKRSDL2_WINDOW_SIZE_IS_LAYER_SIZE)
 	EmscriptenFullscreenStrategy strategy;
 	SDL_memset(&strategy, 0, sizeof(strategy));
