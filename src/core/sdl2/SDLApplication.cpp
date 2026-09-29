@@ -2115,6 +2115,7 @@ void TVPWindowWindow::TickBeat()
 	 * publishes finished frames through the player owned by
 	 * tTJSNI_VideoOverlay, so the picture is uploaded and presented here and
 	 * the engine's own frame is skipped for as long as the movie lasts. */
+	bool video_presented = false;
 	if (TVPLinuxVideoIsActive())
 	{
 		const uint8_t *video_pixels = nullptr;
@@ -2174,16 +2175,30 @@ void TVPWindowWindow::TickBeat()
 					full.h = window_surface->h;
 					SDL_UpdateWindowSurfaceRects(this->window, &full, 1);
 					this->hasDrawn = true;
+					static int video_soft_logs = 0;
+					if (video_soft_logs < 3)
+					{
+						SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+							"VIDEOSOFT frame=%dx%d window=%dx%d", video_width, video_height,
+							window_surface->w, window_surface->h);
+						video_soft_logs++;
+					}
 				}
 			}
 			TVPLinuxVideoReleaseFrame();
+			video_presented = true;
 		}
 	}
 	/* Reporting the end of the movie has to happen on this thread: SetStatus
 	 * delivers onStatusChanged inline and Movie.tjs's phase machine only
 	 * leaves "running" once it sees that stop. */
 	TVPLinuxVideoConsumeFinished();
-	if (TVPLinuxVideoIsActive())
+	/* Only skip the engine picture while a movie frame was actually drawn in
+	 * THIS iteration. Testing TVPLinuxVideoIsActive() instead kept returning
+	 * early after the movie had finished (the overlay stays active until
+	 * Movie.tjs closes it), so the engine never painted another frame and the
+	 * window went - and stayed - black. */
+	if (video_presented)
 	{
 		return;
 	}
