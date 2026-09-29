@@ -309,6 +309,22 @@ list(APPEND KRKRSDL2_LIBS
 	pthread
 )
 
+# Software movie playback. Linux has no native video overlay, so
+# src/core/visual/sdl2/LinuxVideoPlayer.cpp decodes with FFmpeg and the SDL
+# render loop presents the frames; the other platforms keep using their native
+# players (DirectShow / AVPlayer / MediaPlayer) and never touch these libs.
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+	libavformat
+	libavcodec
+	libswscale
+	libswresample
+	libavutil
+)
+list(APPEND KRKRSDL2_LIBS
+	PkgConfig::FFMPEG
+)
+
 # Desktop/linglong identity. The id is compiled in because the engine derives
 # the per-user save directory from it (see ApplicationSpecialPath.h); the
 # install rules at the bottom of this file reuse the same value for the

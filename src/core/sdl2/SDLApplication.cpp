@@ -29,6 +29,9 @@
 #include "StorageIntf.h"
 #include "SDLBitmapCompletion.h"
 #include "ScriptMgnIntf.h"
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__)
+#include "LinuxVideoPlayer.h"
+#endif
 #include "SystemControl.h"
 #include "PluginImpl.h"
 #ifdef KRKRZ_ENABLE_CANVAS
@@ -678,6 +681,13 @@ protected:
 #ifdef KRKRZ_ENABLE_CANVAS
 	tTVPOpenGLScreen *openGlScreen;
 #endif
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__)
+	/* Texture the software-decoded movie frames are uploaded into; see the
+	 * TVPLinuxVideo* bridge in VideoOvlImpl.cpp. */
+	SDL_Texture *videoTexture = nullptr;
+	int videoTextureWidth = 0;
+	int videoTextureHeight = 0;
+#endif
 	int lastMouseX;
 	int lastMouseY;
 
@@ -1145,6 +1155,13 @@ TVPWindowWindow::~TVPWindowWindow()
 		SDL_FreeSurface(this->surface);
 		this->surface = nullptr;
 	}
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__)
+	if (this->videoTexture)
+	{
+		SDL_DestroyTexture(this->videoTexture);
+		this->videoTexture = nullptr;
+	}
+#endif
 	if (this->renderer)
 	{
 		SDL_DestroyRenderer(this->renderer);
@@ -2082,6 +2099,56 @@ void TVPWindowWindow::TickBeat()
 		this->SetVisible(this->isVisible);
 	}
 	this->needsGraphicUpdate = true; // OHOS: always repaint so the software framebuffer is refreshed
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__)
+	/* A playing movie owns the window. The decoder runs on its own thread and
+	 * publishes finished frames through the player owned by
+	 * tTJSNI_VideoOverlay, so the picture is uploaded and presented here and
+	 * the engine's own frame is skipped for as long as the movie lasts. */
+	if (this->renderer && TVPLinuxVideoIsActive())
+	{
+		const uint8_t *video_pixels = nullptr;
+		int video_pitch = 0;
+		int video_width = 0;
+		int video_height = 0;
+		if (TVPLinuxVideoAcquireFrame(&video_pixels, &video_pitch, &video_width, &video_height))
+		{
+			if (this->videoTexture == nullptr ||
+				this->videoTextureWidth != video_width ||
+				this->videoTextureHeight != video_height)
+			{
+				if (this->videoTexture)
+				{
+					SDL_DestroyTexture(this->videoTexture);
+					this->videoTexture = nullptr;
+				}
+				/* BGRA rows from FFmpeg match ARGB8888 in little-endian memory. */
+				this->videoTexture = SDL_CreateTexture(this->renderer, SDL_PIXELFORMAT_ARGB8888,
+					SDL_TEXTUREACCESS_STREAMING, video_width, video_height);
+				this->videoTextureWidth = video_width;
+				this->videoTextureHeight = video_height;
+			}
+			if (this->videoTexture)
+			{
+				SDL_UpdateTexture(this->videoTexture, nullptr, video_pixels, video_pitch);
+				/* The renderer has a logical size of the game resolution, so
+				 * this scales (and letterboxes) the movie like any other frame. */
+				SDL_RenderClear(this->renderer);
+				SDL_RenderCopy(this->renderer, this->videoTexture, nullptr, nullptr);
+				SDL_RenderPresent(this->renderer);
+				this->hasDrawn = true;
+			}
+			TVPLinuxVideoReleaseFrame();
+		}
+	}
+	/* Reporting the end of the movie has to happen on this thread: SetStatus
+	 * delivers onStatusChanged inline and Movie.tjs's phase machine only
+	 * leaves "running" once it sees that stop. */
+	TVPLinuxVideoConsumeFinished();
+	if (TVPLinuxVideoIsActive())
+	{
+		return;
+	}
+#endif
 #if defined(__OHOS__)
 	/* OHOS: while the AVPlayer renders into the XComponent surface, do NOT
 	 * present the SDL framebuffer - they share the same native window and

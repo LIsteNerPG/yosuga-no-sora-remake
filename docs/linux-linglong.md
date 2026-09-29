@@ -150,18 +150,24 @@ UAB 文件通常在 2.5–3.5 GB 之间，超过 GitHub Release 单文件 2 GiB 
 
 手动触发时可以选择导出格式（`both`/`uab`/`layer`）以及是否运行冒烟测试。
 
-## 已知限制
+## 视频播放
 
-- **视频播放尚未实现**。引擎在 Linux 上还没有对应的视频后端（`Movie.tjs`
-  中预留的名字是 "SDL ffmpeg overlay"），因此开场动画（`yosugacn`）与片尾
-  staff roll 会被自动跳过，其余流程不受影响：`PlayMovie()` 返回 false 后由
-  `MemoriesModeHD.finishOpeningMovie()` / `Title.MovieScene` 接管继续。
-  实现细节见 `src/core/visual/sdl2/VideoOvlImpl.cpp` 中 `Open()` 的
-  `__linux__` 分支说明 —— 这里刻意让打开视频**显式失败**而不是静默返回，
-  否则 `Movie.tjs` 的相位机会一直等待永远不会到来的 `onStatusChanged("stop")`，
-  导致游戏卡死在开场或片尾。
-- 引擎其余功能（脚本、图像、BGM/音效、存档、手柄、窗口/全屏）与 Windows、
-  macOS 版本一致。
+Linux 没有原生视频叠加层（Windows 用 DirectShow、macOS/iOS 与 OHOS 用
+AVPlayer、Android 用 MediaPlayer），因此 `Movie.tjs` 里为其余平台预留的
+"SDL ffmpeg overlay" 分支在 Linux 上由一套 FFmpeg 软件后端实现：
+
+- [LinuxVideoPlayer.cpp](src/core/visual/sdl2/LinuxVideoPlayer.cpp) 在独立线程里
+  解封装并解码：视频经 `swscale` 转成 BGRA，音频经 `swresample` 转成 S16
+  交给 SDL 音频设备；画面按 PTS 与挂钟对齐，音频由设备按自身节奏消费；
+- 解码好的帧由 [SDLApplication.cpp](src/core/sdl2/SDLApplication.cpp) 的
+  `TickBeat` 上传成纹理并整窗呈现。渲染器已设置逻辑尺寸为游戏分辨率，
+  所以影片同样会被 letterbox 缩放，不会像早期的窗口表面路径那样被裁切；
+- 播放结束由主线程轮询转成 `onStatusChanged("stop")` —— 与其它平台的原生
+  播放器满足同一个契约，`Movie.tjs` 的相位机因此能正常推进。
+
+构建期需要 `libavformat-dev / libavcodec-dev / libswscale-dev /
+libswresample-dev / libavutil-dev`；运行时 `libavformat60` 与 `libswscale7`
+随包安装（base 已自带 `libavcodec60` / `libavutil58` / `libswresample4`）。
 
 ## 故障排查
 

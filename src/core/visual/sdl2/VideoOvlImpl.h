@@ -14,6 +14,8 @@
 #include "tjsNative.h"
 #include "WindowIntf.h"
 
+#include <cstdint>
+
 #include "VideoOvlIntf.h"
 #include "StorageIntf.h"
 #include "UtilStreams.h"
@@ -24,6 +26,14 @@
 
 #if defined(__APPLE__)
 #define KRKRSDL2_MACOS_VIDEO_OVERLAY 1
+#endif
+
+/* Linux has no native video overlay (DirectShow / AVPlayer / MediaPlayer), so
+ * it gets a software FFmpeg player instead - the backend Movie.tjs already
+ * calls "SDL ffmpeg overlay". Keep Android and OHOS out: they also define
+ * __linux__ but have their own native players. */
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__)
+#define KRKRSDL2_LINUX_VIDEO_PLAYER 1
 #endif
 
 //---------------------------------------------------------------------------
@@ -37,6 +47,10 @@ class tTJSNI_VideoOverlay : public tTJSNI_BaseVideoOverlay
 	iTVPVideoOverlay *VideoOverlay;
 #ifdef KRKRSDL2_MACOS_VIDEO_OVERLAY
 	void *MacVideoOverlay;
+#endif
+#ifdef KRKRSDL2_LINUX_VIDEO_PLAYER
+	class TVPLinuxVideoPlayer *LinuxPlayer;
+	bool LinuxFinishedReported;
 #endif
 
 	tTVPRect Rect;
@@ -88,6 +102,15 @@ public:
 
 #ifdef KRKRSDL2_MACOS_VIDEO_OVERLAY
 	void MacPlaybackFinished();
+#endif
+#ifdef KRKRSDL2_LINUX_VIDEO_PLAYER
+	/* Called from the main thread once the decoder reached the end of the
+	 * movie; turns that into the onStatusChanged("stop") the TJS layer needs. */
+	void LinuxPlaybackFinished();
+	/* Render-thread accessors used by TVPLinuxVideo* in LinuxVideoPlayer.h. */
+	bool LinuxAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height);
+	void LinuxReleaseFrame();
+	bool LinuxIsFinished() const;
 #endif
 #ifdef __ANDROID__
 	void AndroidPlaybackFinished();

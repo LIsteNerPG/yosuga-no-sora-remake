@@ -61,9 +61,20 @@ buildext:
       - libudev-dev
       - libunwind-dev
       - libfontconfig1-dev
+      # FFmpeg：Linux 的软件视频播放后端（其余平台走各自的原生播放器）
+      - libavformat-dev
+      - libavcodec-dev
+      - libswscale-dev
+      - libswresample-dev
+      - libavutil-dev
       # ccache 让 CI 在多次运行之间复用编译产物：玲珑容器映射宿主的
       # $HOME，因此 ~/.cache/ccache 会落在工作流缓存目录里。
       - ccache
+    # base 自带 libavcodec60 / libavutil58 / libswresample4，但视频后端还需要
+    # libavformat（解封装）与 libswscale（色彩空间/缩放），这里把它们打进包。
+    depends:
+      - libavformat60
+      - libswscale7
 
 build: |
   set -eux

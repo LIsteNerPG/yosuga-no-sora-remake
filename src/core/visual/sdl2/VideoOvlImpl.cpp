@@ -41,6 +41,9 @@
 #ifdef KRKRSDL2_MACOS_VIDEO_OVERLAY
 #include "MacVideoOverlay.h"
 #endif
+#ifdef KRKRSDL2_LINUX_VIDEO_PLAYER
+#include "LinuxVideoPlayer.h"
+#endif
 #if defined(_WIN32) && defined(KRKRSDL2_USE_WIN32_EVENT_QUEUE) && defined(KRKRSDL2_ENABLE_VIDEOOVERLAY)
 #include "TVPVideoOverlay.h"
 #else
@@ -50,6 +53,11 @@
 
 //---------------------------------------------------------------------------
 static std::vector<tTJSNI_VideoOverlay *> TVPVideoOverlayVector;
+#if defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+/* The overlay whose movie is currently playing. The SDL render loop looks the
+ * frames up through this pointer (see the TVPLinuxVideo* bridge below). */
+static tTJSNI_VideoOverlay *LinuxVideoActiveOverlay = nullptr;
+#endif
 #if defined(__OHOS__)
 #include <dlfcn.h>
 /* Resolve the OHOS AVPlayer bridge exported by libentry.so at run time so the
@@ -217,6 +225,10 @@ tTJSNI_VideoOverlay::tTJSNI_VideoOverlay()
 #endif
 #ifdef KRKRSDL2_MACOS_VIDEO_OVERLAY
 	MacVideoOverlay = nullptr;
+#endif
+#ifdef KRKRSDL2_LINUX_VIDEO_PLAYER
+	LinuxPlayer = nullptr;
+	LinuxFinishedReported = false;
 #endif
 #ifdef __ANDROID__
 	AndroidVideoOpen = false;
@@ -532,19 +544,44 @@ void tTJSNI_VideoOverlay::Open(const ttstr &_name)
 	 * Shutdown() releases the AVPlayer (state 7/AV_RELEASED in the log),
 	 * m_playing drops so the engine resumes presenting over the video and
 	 * the movie freezes on its first frame. play() sets the Play status. */
-#elif defined(__linux__)
-	/* Linux/linglong: the software player behind the "SDL ffmpeg overlay"
-	 * backend that Movie.tjs selects on every other platform is not
-	 * implemented yet, so opening a movie has to fail explicitly.
-	 * Leaving Open() empty is NOT a safe no-op: Movie.tjs advances its phase
-	 * machine to "running", PlayMovie() returns true, and the game then waits
-	 * forever for an onStatusChanged("stop") that would never arrive - the
-	 * opening movie and every staff roll would freeze the game.
-	 * Throwing makes PlayMovie() return false, which the game already handles
-	 * by skipping the movie (MemoriesModeHD.finishOpeningMovie(),
-	 * Title.MovieScene -> returnToTitle), so play continues without video. */
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	/* Linux: software FFmpeg playback. The frame lands in the player's own
+	 * buffer and the SDL render loop draws it as a full-window texture (see
+	 * the TVPLinuxVideo* bridge and TickBeat in SDLApplication.cpp). */
 	Close();
-	TVPThrowExceptionMessage(TVPErrorInKrMovieDLL, _name);
+
+	if(!Window) TVPThrowExceptionMessage(TVPWindowAlreadyMissing);
+
+	ttstr placedName = TVPGetPlacedPath(_name);
+	if(placedName.IsEmpty())
+		TVPThrowExceptionMessage(TVPErrorInKrMovieDLL, _name);
+
+	/* The movie may live inside an xp3 archive; the temp holder extracts it to
+	 * the file system when that is the case. */
+	if(LocalTempStorageHolder)
+		delete LocalTempStorageHolder, LocalTempStorageHolder = NULL;
+	LocalTempStorageHolder = new tTVPLocalTempStorageHolder(placedName);
+
+	std::string filename;
+	if(!TVPUtf16ToUtf8(filename,
+		LocalTempStorageHolder->GetLocalName().AsStdString()))
+	{
+		Close();
+		TVPThrowExceptionMessage(TVPErrorInKrMovieDLL, _name);
+	}
+
+	if(!LinuxPlayer)
+		LinuxPlayer = new TVPLinuxVideoPlayer();
+
+	if(!LinuxPlayer->Open(filename.c_str()))
+	{
+		delete LinuxPlayer, LinuxPlayer = nullptr;
+		Close();
+		TVPThrowExceptionMessage(TVPErrorInKrMovieDLL, _name);
+	}
+	LinuxFinishedReported = false;
+	LinuxVideoActiveOverlay = this;
+	SetStatus(tTVPVideoOverlayStatus::Stop);
 #endif
 }
 //---------------------------------------------------------------------------
@@ -595,9 +632,16 @@ void tTJSNI_VideoOverlay::Close()
 	if(!OHOSTempFile.IsEmpty()) OHOSTempFile.Clear();
 	if(!OHOSTempFolder.IsEmpty()) OHOSTempFolder.Clear();
 	SetStatus(tTVPVideoOverlayStatus::Unload);
-#elif defined(__linux__)
-	/* No Linux player yet (see Open()); report Unload so the TJS layer and a
-	 * future backend both start from a known status. */
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	if(LinuxVideoActiveOverlay == this) LinuxVideoActiveOverlay = nullptr;
+	if(LinuxPlayer)
+	{
+		LinuxPlayer->Close();
+		delete LinuxPlayer, LinuxPlayer = nullptr;
+	}
+	if(LocalTempStorageHolder)
+		delete LocalTempStorageHolder, LocalTempStorageHolder = NULL;
+	LinuxFinishedReported = false;
 	SetStatus(tTVPVideoOverlayStatus::Unload);
 #endif
 }
@@ -655,6 +699,17 @@ void tTJSNI_VideoOverlay::Shutdown()
 	 * the next playback (and next launch) reuses it without re-copying */
 	if(!OHOSTempFile.IsEmpty()) OHOSTempFile.Clear();
 	if(!OHOSTempFolder.IsEmpty()) OHOSTempFolder.Clear();
+	SetStatus(tTVPVideoOverlayStatus::Unload);
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	if(LinuxVideoActiveOverlay == this) LinuxVideoActiveOverlay = nullptr;
+	if(LinuxPlayer)
+	{
+		LinuxPlayer->Stop();
+		LinuxPlayer->Close();
+		delete LinuxPlayer, LinuxPlayer = nullptr;
+	}
+	if(LocalTempStorageHolder)
+		delete LocalTempStorageHolder, LocalTempStorageHolder = NULL;
 	SetStatus(tTVPVideoOverlayStatus::Unload);
 #endif
 }
@@ -738,6 +793,12 @@ void tTJSNI_VideoOverlay::Play()
 	OHOSVideoResolveBridge();
 	if (OHOSVideoResumeFn) OHOSVideoResumeFn();
 	SetStatus(tTVPVideoOverlayStatus::Play);
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	if(LinuxPlayer)
+	{
+		LinuxPlayer->Play();
+		SetStatus(tTVPVideoOverlayStatus::Play);
+	}
 #endif
 }
 //---------------------------------------------------------------------------
@@ -768,6 +829,12 @@ void tTJSNI_VideoOverlay::Stop()
 	OHOSVideoResolveBridge();
 	if(OHOSVideoStopFn) OHOSVideoStopFn();
 	SetStatus(tTVPVideoOverlayStatus::Stop);
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	if(LinuxPlayer)
+	{
+		LinuxPlayer->Stop();
+		SetStatus(tTVPVideoOverlayStatus::Stop);
+	}
 #endif
 }
 //---------------------------------------------------------------------------
@@ -802,6 +869,12 @@ void tTJSNI_VideoOverlay::Pause()
 	OHOSVideoResolveBridge();
 	if (OHOSVideoPauseFn) OHOSVideoPauseFn();
 	SetStatus(tTVPVideoOverlayStatus::Pause);
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	if(LinuxPlayer)
+	{
+		LinuxPlayer->Pause();
+		SetStatus(tTVPVideoOverlayStatus::Pause);
+	}
 #endif
 }
 void tTJSNI_VideoOverlay::Rewind()
@@ -820,6 +893,8 @@ void tTJSNI_VideoOverlay::Rewind()
 	if(MacVideoOverlay) TVPMacVideoRewind(MacVideoOverlay);
 #elif defined(__ANDROID__)
 	if(AndroidVideoOpen) TVPAndroidCallMovieVoid("rewindMovie");
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	if(LinuxPlayer) LinuxPlayer->Rewind();
 #endif
 }
 void tTJSNI_VideoOverlay::Prepare()
@@ -1446,6 +1521,9 @@ tjs_int tTJSNI_VideoOverlay::GetAudioVolume()
 		return (tjs_int)(TVPMacVideoGetVolume(MacVideoOverlay) * 100000.0f);
 #elif defined(__ANDROID__)
 	return AndroidVideoOpen ? 100000 : 0;
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	if(LinuxPlayer)
+		return (tjs_int)(LinuxPlayer->Volume() * 100000.0f);
 #endif
 	return TVPDSAttenuateToVolume( result );
 }
@@ -1466,6 +1544,13 @@ void tTJSNI_VideoOverlay::SetAudioVolume(tjs_int b)
 		if(b > 100000) b = 100000;
 		TVPAndroidCallMovieVolume(static_cast<float>(b) / 100000.0f);
 	}
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	if(LinuxPlayer)
+	{
+		if(b < 0) b = 0;
+		if(b > 100000) b = 100000;
+		LinuxPlayer->SetVolume((float)b / 100000.0f);
+	}
 #endif
 }
 tjs_uint tTJSNI_VideoOverlay::GetNumberOfAudioStream()
@@ -1480,6 +1565,8 @@ tjs_uint tTJSNI_VideoOverlay::GetNumberOfAudioStream()
 	if(MacVideoOverlay) result = TVPMacVideoHasAudio(MacVideoOverlay) ? 1 : 0;
 #elif defined(__ANDROID__)
 	if(AndroidVideoOpen) result = 1;
+#elif defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+	if(LinuxPlayer && LinuxPlayer->HasAudio()) result = 1;
 #endif
 	return result;
 }
@@ -1988,4 +2075,72 @@ tTJSNativeClass * TVPCreateNativeClass_VideoOverlay()
 {
 	return new tTJSNC_VideoOverlay();
 }
+//---------------------------------------------------------------------------
+#if defined(KRKRSDL2_LINUX_VIDEO_PLAYER)
+/* ---------------------------------------------------------------------------
+ * Software video playback bridge
+ *
+ * tTJSNI_VideoOverlay owns the FFmpeg player (created in Open()); the SDL
+ * render loop in SDLApplication.cpp asks for the newest decoded frame through
+ * these entry points and draws it as a window-sized texture. The completion
+ * notification has to run on the main thread because SetStatus() fires the
+ * onStatusChanged TJS event inline, so the render loop polls for the end of
+ * the movie once per frame instead of the decoder thread calling back.
+ * ------------------------------------------------------------------------- */
+bool tTJSNI_VideoOverlay::LinuxAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height)
+{
+	if(!LinuxPlayer) return false;
+	const uint8_t *data = nullptr;
+	int line_size = 0;
+	if(!LinuxPlayer->AcquireFrame(&data, &line_size)) return false;
+	*pixels = data;
+	*pitch = line_size;
+	*width = LinuxPlayer->Width();
+	*height = LinuxPlayer->Height();
+	return true;
+}
+//---------------------------------------------------------------------------
+void tTJSNI_VideoOverlay::LinuxReleaseFrame()
+{
+	if(LinuxPlayer) LinuxPlayer->ReleaseFrame();
+}
+//---------------------------------------------------------------------------
+bool tTJSNI_VideoOverlay::LinuxIsFinished() const
+{
+	return LinuxPlayer != nullptr && LinuxPlayer->IsFinished() && !LinuxFinishedReported;
+}
+//---------------------------------------------------------------------------
+void tTJSNI_VideoOverlay::LinuxPlaybackFinished()
+{
+	if(LinuxFinishedReported) return;
+	LinuxFinishedReported = true;
+	/* Same contract as the native players on the other platforms: the TJS
+	 * phase machine in Movie.tjs only leaves "running" when it sees this. */
+	SetStatus(tTVPVideoOverlayStatus::Stop);
+}
+//---------------------------------------------------------------------------
+bool TVPLinuxVideoIsActive()
+{
+	return LinuxVideoActiveOverlay != nullptr;
+}
+//---------------------------------------------------------------------------
+bool TVPLinuxVideoAcquireFrame(const uint8_t **pixels, int *pitch, int *width, int *height)
+{
+	if(!LinuxVideoActiveOverlay) return false;
+	return LinuxVideoActiveOverlay->LinuxAcquireFrame(pixels, pitch, width, height);
+}
+//---------------------------------------------------------------------------
+void TVPLinuxVideoReleaseFrame()
+{
+	if(LinuxVideoActiveOverlay) LinuxVideoActiveOverlay->LinuxReleaseFrame();
+}
+//---------------------------------------------------------------------------
+bool TVPLinuxVideoConsumeFinished()
+{
+	if(!LinuxVideoActiveOverlay) return false;
+	if(!LinuxVideoActiveOverlay->LinuxIsFinished()) return false;
+	LinuxVideoActiveOverlay->LinuxPlaybackFinished();
+	return true;
+}
+#endif
 //---------------------------------------------------------------------------
