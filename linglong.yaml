@@ -75,6 +75,14 @@ build: |
 
   echo "building ${APP_ID} ${APP_VERSION} into ${PREFIX}"
 
+  # 构建环境自检：这些信息在 CI 排障时非常有用。
+  uname -srm
+  echo "nproc=$(nproc)"
+  df -h /project | tail -n 1
+  ccache --version | head -n 1 || true
+  cmake --version | head -n 1
+  ninja --version
+
   # 数据必须存在：玲珑包内嵌完整游戏内容，缺失时应当立即失败而不是产出空包。
   test -f /project/data/startup.tjs
 

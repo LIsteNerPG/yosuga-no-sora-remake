@@ -37,6 +37,11 @@ name: Release Linux Linglong
         required: true
         default: true
         type: boolean
+      publish:
+        description: 'Create or update the GitHub Release with the built assets'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -89,6 +94,7 @@ jobs:
           INPUT_MODE: ${{ inputs.mode }}
           INPUT_EXPORT_FORMAT: ${{ inputs.export_format }}
           INPUT_SMOKE_TEST: ${{ inputs.smoke_test }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
         run: |
           set -euo pipefail
           publish=true
@@ -101,6 +107,9 @@ jobs:
           elif [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
             release_tag="${INPUT_RELEASE_TAG//[[:space:]]/}"
             is_prerelease="$INPUT_PRERELEASE"
+            # A manual run can build and export without touching the release,
+            # which is what the first validation runs use.
+            publish="${INPUT_PUBLISH:-true}"
           else
             release_tag="v0.0.0-ci.${GITHUB_RUN_NUMBER}"
             is_prerelease=true

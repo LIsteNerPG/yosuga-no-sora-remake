@@ -532,6 +532,19 @@ void tTJSNI_VideoOverlay::Open(const ttstr &_name)
 	 * Shutdown() releases the AVPlayer (state 7/AV_RELEASED in the log),
 	 * m_playing drops so the engine resumes presenting over the video and
 	 * the movie freezes on its first frame. play() sets the Play status. */
+#elif defined(__linux__)
+	/* Linux/linglong: the software player behind the "SDL ffmpeg overlay"
+	 * backend that Movie.tjs selects on every other platform is not
+	 * implemented yet, so opening a movie has to fail explicitly.
+	 * Leaving Open() empty is NOT a safe no-op: Movie.tjs advances its phase
+	 * machine to "running", PlayMovie() returns true, and the game then waits
+	 * forever for an onStatusChanged("stop") that would never arrive - the
+	 * opening movie and every staff roll would freeze the game.
+	 * Throwing makes PlayMovie() return false, which the game already handles
+	 * by skipping the movie (MemoriesModeHD.finishOpeningMovie(),
+	 * Title.MovieScene -> returnToTitle), so play continues without video. */
+	Close();
+	TVPThrowExceptionMessage(TVPErrorInKrMovieDLL, _name);
 #endif
 }
 //---------------------------------------------------------------------------
@@ -581,6 +594,10 @@ void tTJSNI_VideoOverlay::Close()
 	 * the next playback (and next launch) reuses it without re-copying */
 	if(!OHOSTempFile.IsEmpty()) OHOSTempFile.Clear();
 	if(!OHOSTempFolder.IsEmpty()) OHOSTempFolder.Clear();
+	SetStatus(tTVPVideoOverlayStatus::Unload);
+#elif defined(__linux__)
+	/* No Linux player yet (see Open()); report Unload so the TJS layer and a
+	 * future backend both start from a known status. */
 	SetStatus(tTVPVideoOverlayStatus::Unload);
 #endif
 }
