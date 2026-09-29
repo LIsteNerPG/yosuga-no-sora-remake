@@ -65,12 +65,36 @@ void TVPSDLBitmapCompletion::NotifyBitmapCompleted(iTVPLayerManager * manager,
 
 		if (surface)
 		{
+			/* The window surface can be smaller than the layer the engine draws
+			 * into: the game switches to fullscreen right after startup
+			 * (CONFIG.fullScreen defaults to 1), which resizes the window while
+			 * the primary layer keeps its own virtual resolution. Without this
+			 * clip the rows past the end of the surface buffer are written,
+			 * corrupting the heap and producing the garbled picture on screen.
+			 * Columns are bounded the same way for the same reason. */
+			const long surface_pitch = surface->pitch;
+			const long surface_width_bytes = (long)surface->w * (long)sizeof(tjs_uint32);
+			const long dest_x_bytes = dest_x * (long)sizeof(tjs_uint32);
+			const long src_x_bytes = src_x * (long)sizeof(tjs_uint32);
 			SDL_LockSurface(surface);
 			for (; src_y < src_y_limit; src_y++, dest_y++)
 			{
-				const void *srcp = src_p + src_pitch * src_y + src_x * sizeof(tjs_uint32);
-				void *destp = (tjs_uint8*)surface->pixels + surface->pitch * dest_y + dest_x * sizeof(tjs_uint32);
-				SDL_memcpy(destp, srcp, width_bytes);
+				if (dest_y < 0 || dest_y >= surface->h)
+				{
+					continue;
+				}
+				long copy_bytes = width_bytes;
+				if (dest_x_bytes + copy_bytes > surface_width_bytes)
+				{
+					copy_bytes = surface_width_bytes - dest_x_bytes;
+				}
+				if (copy_bytes <= 0)
+				{
+					continue;
+				}
+				const void *srcp = src_p + src_pitch * src_y + src_x_bytes;
+				void *destp = (tjs_uint8*)surface->pixels + surface_pitch * dest_y + dest_x_bytes;
+				SDL_memcpy(destp, srcp, copy_bytes);
 			}
 			SDL_UnlockSurface(surface);
 		}

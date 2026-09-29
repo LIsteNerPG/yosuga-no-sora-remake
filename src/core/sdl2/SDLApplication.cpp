@@ -2114,6 +2114,33 @@ void TVPWindowWindow::TickBeat()
 		SDL_GetWindowSurface(this->window);
 	}
 #endif
+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__OHOS__)
+	/* Linux never creates an SDL_Renderer (see the renderer creation in the
+	 * constructor), so the engine paints straight into the surface returned
+	 * by SDL_GetWindowSurface() and TVPSDLBitmapCompletion memcpy's every
+	 * completed bitmap into it. Any window resize invalidates that surface -
+	 * and the game always performs one, because Window.tjs switches to
+	 * SDL_WINDOW_FULLSCREEN_DESKTOP right after start (CONFIG.fullScreen
+	 * defaults to 1). SDL_UpdateWindowSurfaceRects then silently no-ops while
+	 * the engine keeps writing into the stale surface, so the window shows
+	 * its decorations with no content at all.
+	 * Re-acquire the surface and republish the pointer to both owners. The
+	 * OHOS branch above deliberately must NOT do this (it has a renderer and
+	 * this->surface is the engine's own bitmap there), which is why Linux
+	 * needs its own branch. */
+	if (this->window && !this->renderer)
+	{
+		SDL_Surface *window_surface = SDL_GetWindowSurface(this->window);
+		if (window_surface && window_surface != this->surface)
+		{
+			this->surface = window_surface;
+			if (this->bitmapCompletion)
+			{
+				this->bitmapCompletion->surface = window_surface;
+			}
+		}
+	}
+#endif
 	if (this->needsGraphicUpdate)
 	{
 		if (this->bitmapCompletion)
