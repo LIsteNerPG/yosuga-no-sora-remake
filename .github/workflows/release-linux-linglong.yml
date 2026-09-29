@@ -55,11 +55,7 @@ permissions:
   contents: write
 
 concurrency:
-  # Manual dispatches all share the same github.ref, so without the release tag
-  # in the group key a second dispatch cancels a run that is already half way
-  # through its smoke test. Keying on the tag keeps different releases
-  # independent while still serialising repeats of the same one.
-  group: release-${{ github.workflow }}-${{ inputs.release_tag || github.ref }}
+  group: release-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -332,17 +328,46 @@ jobs:
           sleep 3
           shot="$RUNNER_TEMP/linglong-shot.png"
           log="$RUNNER_TEMP/linglong-run.log"
-          rm -f "$shot"
+          diag="$RUNNER_TEMP/linglong-diag.txt"
+          rm -f "$shot" "$diag"
           # The engine needs a while to initialise, switch to fullscreen and
           # paint its first frames; grab the framebuffer while it still runs.
-          ( sleep 100; import -window root "$shot" 2>/dev/null || true ) &
+          # The X window tree is dumped at the same moment: the engine can be
+          # drawing perfectly (its own VIDSOFTBLIT log confirms the blit) while
+          # the screenshot stays black, and only the window tree shows whether
+          # the window was really mapped on this display.
+          (
+            sleep 100
+            {
+              echo "=== xwininfo -root -tree ==="
+              xwininfo -root -tree 2>&1 || true
+              echo
+              echo "=== xlsclients ==="
+              xlsclients -l 2>&1 | head -n 40 || true
+            } > "$diag" 2>&1
+            import -window root "$shot" 2>/dev/null || true
+          ) &
           set +e
           timeout --signal=TERM --kill-after=30 180 ll-builder run > "$log" 2>&1
           status=$?
           set -e
           echo "--- ll-builder run exit status: $status ---"
           grep -v 'LYRIMGCHG' "$log" | tail -n 80 || true
+          cat "$diag" 2>/dev/null || true
           ls -l "$shot" 2>/dev/null || echo "no screenshot was captured"
+
+      - name: Upload smoke test diagnostics
+        if: always() && steps.release.outputs.mode == 'full' && steps.release.outputs.smoke-test == 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: smoke-diagnostics
+          path: |
+            ${{ runner.temp }}/linglong-shot.png
+            ${{ runner.temp }}/linglong-diag.txt
+            ${{ runner.temp }}/linglong-run.log
+          if-no-files-found: warn
+          retention-days: 5
 
       - name: Verify the headless run rendered a picture
         if: steps.release.outputs.mode == 'full' && steps.release.outputs.smoke-test == 'true'
