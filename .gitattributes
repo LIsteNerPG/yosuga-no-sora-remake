@@ -1,0 +1,6 @@
+# Shell scripts, the linglong build manifest and the desktop template are
+# consumed by Linux tooling (bash, ll-builder, desktop-file-validate) even when
+# the checkout happens on Windows, so they must keep LF endings everywhere.
+*.sh text eol=lf
+linglong.yaml text eol=lf
+*.desktop.in text eol=lf
