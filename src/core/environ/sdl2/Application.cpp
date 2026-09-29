@@ -924,7 +924,17 @@ void tTVPApplication::Run() {
 		if (SDL_WasInit(SDL_INIT_EVENTS) != 0)
 		{
 #ifndef __EMSCRIPTEN__
+#if defined(__linux__)
+			/* SDL_WaitEvent() only returns once an event arrives, so a session
+			 * without input traffic - a headless Xvfb run, or simply a player
+			 * who is not touching anything - parked the loop right here and
+			 * the engine stopped presenting frames after the first one (the CI
+			 * smoke test captured a completely black window because of this).
+			 * A bounded wait keeps rendering while still yielding the CPU. */
+			SDL_WaitEventTimeout(NULL, 16);
+#else
 			SDL_WaitEvent(NULL);
+#endif
 #endif
 		}
 	}

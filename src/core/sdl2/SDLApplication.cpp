@@ -2251,6 +2251,16 @@ void TVPWindowWindow::TickBeat()
 #endif
 	if (this->needsGraphicUpdate)
 	{
+		static int vidtick_dbg = 0;
+		if (vidtick_dbg < 5)
+		{
+			SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+				"VIDTICK needs=%d bmp=%p win=%p surf=%p rnd=%p shaderr=%s",
+				(int)this->needsGraphicUpdate, (void *)this->bitmapCompletion,
+				(void *)this->window, (void *)this->surface, (void *)this->renderer,
+				SDL_GetError());
+			vidtick_dbg++;
+		}
 		if (this->bitmapCompletion)
 		{
 			SDL_Rect rect;
@@ -2334,18 +2344,26 @@ void TVPWindowWindow::TickBeat()
 				 * shows a scaled-down picture instead of clipping a 1920x1080
 				 * one. This is what makes the resolution setting work. */
 				SDL_Surface *window_surface = SDL_GetWindowSurface(this->window);
+				static int soft_blit_logs = 0;
+				if (soft_blit_logs < 5)
+				{
+					SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+						"VIDREACH winsurf=%p same=%d winsurf_size=%dx%d rect=%d,%d %dx%d",
+						(void *)window_surface, window_surface == this->surface ? 1 : 0,
+						window_surface ? window_surface->w : 0, window_surface ? window_surface->h : 0,
+						rect.x, rect.y, rect.w, rect.h);
+					soft_blit_logs++;
+				}
 				if (window_surface != nullptr && window_surface != this->surface)
 				{
 					int blit = SDL_BlitScaled(this->surface, nullptr, window_surface, nullptr);
-					static int soft_blit_logs = 0;
-					if (soft_blit_logs < 3)
+					if (soft_blit_logs <= 5)
 					{
 						SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
 							"VIDSOFTBLIT src=%dx%d dst=%dx%d result=%d err=%s",
 							this->surface->w, this->surface->h,
 							window_surface->w, window_surface->h,
 							blit, blit == 0 ? "-" : SDL_GetError());
-						soft_blit_logs++;
 					}
 				}
 				SDL_UpdateWindowSurfaceRects(this->window, &rect, 1);
