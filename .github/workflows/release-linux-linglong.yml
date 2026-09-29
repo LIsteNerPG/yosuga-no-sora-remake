@@ -240,18 +240,16 @@ jobs:
       - name: Build the linglong package
         if: steps.release.outputs.mode == 'full'
         shell: bash
-        env:
-          CCACHE_DIR: ${{ github.workspace }}/.ccache
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends ccache
-          ccache --zero-stats || true
           df -h /
           # 'll-builder build' mounts the project root as /project and installs
           # into ${PREFIX} = /opt/apps/<id>/files inside the builder cache.
+          # ccache is a build_depends entry of linglong.yaml and writes to the
+          # host's ~/.cache/ccache (the container maps $HOME), which is exactly
+          # the directory the cache steps above restore and save.
           ll-builder build
           ll-builder list
-          ccache --show-stats || true
 
       - name: Save cached ccache
         if: steps.release.outputs.mode == 'full' && steps.ccache.outputs.cache-hit != 'true'

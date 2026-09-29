@@ -17,7 +17,7 @@ version: "1"
 package:
   id: io.github.shuimo0413.yosuganosora
   name: yosuga-no-sora-remake
-  version: 1.0.12.0
+  version: 1.0.0.0
   kind: app
   description: |
     缘之空：高清重制（Yosuga no Sora: HD Remake）Linux 版。
@@ -61,6 +61,9 @@ buildext:
       - libudev-dev
       - libunwind-dev
       - libfontconfig1-dev
+      # ccache 让 CI 在多次运行之间复用编译产物：玲珑容器映射宿主的
+      # $HOME，因此 ~/.cache/ccache 会落在工作流缓存目录里。
+      - ccache
 
 build: |
   set -eux
@@ -78,6 +81,8 @@ build: |
   cmake -S /project -B /project/build/linglong -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
+    -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+    -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
     -DOPTION_BUILD_MACOS_BUNDLE=OFF \
     -DKRKRSDL2_GENERATE_CONTENT_MANIFEST=OFF \
     -DKRKRSDL2_VERSION_NAME="${APP_VERSION}" \
@@ -93,4 +98,5 @@ build: |
   test -f "${PREFIX}/share/applications/${APP_ID}.desktop"
   test -f "${PREFIX}/share/icons/hicolor/256x256/apps/${ICON_NAME}.png"
 
+  ccache --show-stats || true
   echo "installed: $(du -sh "${PREFIX}" | cut -f1)"
