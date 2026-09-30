@@ -22,7 +22,7 @@
    build that bypasses CMake still gets a namespaced per-user save directory
    instead of writing next to the executable. */
 #ifndef KRKRSDL2_LINUX_APP_ID
-#define KRKRSDL2_LINUX_APP_ID "yosuganosora"
+#define KRKRSDL2_LINUX_APP_ID "com.shuimo0413.yosuganosora.hdremake"
 #endif
 
 #if defined(__APPLE__) && TARGET_OS_IPHONE
@@ -230,7 +230,13 @@ public:
 					{
 						save_base += '/';
 					}
+					/* <app-id>/savedata, mirroring the layout the other
+					 * platforms use (iOS keeps its files in
+					 * Documents/<bundle-id>/savedata): the game's own data lives
+					 * in a subdirectory of the application folder instead of
+					 * being mixed with unrelated per-user state. */
 					save_base += KRKRSDL2_LINUX_APP_ID;
+					save_base += "/savedata";
 				}
 			}
 			tjs_string save_path;

@@ -80,13 +80,24 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           submodules: recursive
+          # The build never looks at history; only the working tree matters.
+          fetch-depth: 1
 
       - name: Reclaim runner disk space
         shell: bash
+        continue-on-error: true
         run: |
           set -euo pipefail
-          # The game data alone is ~4 GiB and the linglong cache holds another
-          # full copy, so the preinstalled toolchains have to go.
+          # The current runner images have ~145 GB and this build finishes with
+          # 90+ GB still free, so the cleanup is usually pointless - and it is
+          # slow: unlinking the Android SDK alone (hundreds of thousands of
+          # files) took ~2 minutes. Only do it when the disk is actually small.
+          avail="$(df --output=avail -BG / | tail -n 1 | tr -dc '0-9')"
+          if [[ "${avail:-0}" -gt 40 ]]; then
+            echo "root has ${avail}G free; skipping the cleanup"
+            df -h /
+            exit 0
+          fi
           sudo rm -rf \
             /usr/share/dotnet \
             /usr/local/lib/android \
@@ -395,7 +406,9 @@ jobs:
           # the screenshot stays black, and only the window tree shows whether
           # the window was really mapped on this display.
           (
-            sleep 100
+            # The engine paints its first frames within seconds; 60 s is ample
+            # and the framebuffer check reads the engine log anyway.
+            sleep 60
             {
               echo "=== xwininfo -root -tree ==="
               xwininfo -root -tree 2>&1 || true
@@ -424,7 +437,7 @@ jobs:
           echo "--- container environment ---"
           cat "$RUNNER_TEMP/container-env.txt" 2>/dev/null || true
           set +e
-          timeout --signal=TERM --kill-after=30 180 ll-builder run > "$log" 2>&1
+          timeout --signal=TERM --kill-after=30 120 ll-builder run > "$log" 2>&1
           status=$?
           set -e
           echo "--- ll-builder run exit status: $status ---"
@@ -576,7 +589,7 @@ jobs:
             echo '     (open the .7z.001 with 7-Zip / p7zip)'
             echo '  2. sudo ll-cli install ./Yosuga-no-Sora-HD-Remake-Linux-*.uab'
             echo '  3. launch it from the application menu, or run'
-            echo '     ll-cli run io.github.shuimo0413.yosuganosora'
+            echo '     ll-cli run com.shuimo0413.yosuganosora.hdremake'
             echo
             echo 'SHA-256 checksums of the release assets:'
             for volume in "${volumes[@]}"; do

@@ -52,7 +52,7 @@ sudo apt install build-essential cmake ninja-build pkg-config \
 ```
 <prefix>/bin/krkrsdl2
 <prefix>/share/yosuga-no-sora-remake/data/…          # 完整游戏内容
-<prefix>/share/applications/io.github.shuimo0413.yosuganosora.desktop
+<prefix>/share/applications/com.shuimo0413.yosuganosora.hdremake.desktop
 <prefix>/share/icons/hicolor/<size>x<size>/apps/yosuganosora.png
 ```
 
@@ -61,7 +61,7 @@ sudo apt install build-essential cmake ninja-build pkg-config \
 | 选项 | 默认 | 说明 |
 | --- | --- | --- |
 | `KRKRSDL2_INSTALL_LINUX_DATA` | `ON` | 安装 `data/` 游戏内容；关闭后只安装引擎与桌面文件 |
-| `KRKRSDL2_LINUX_APP_ID` | `io.github.shuimo0413.yosuganosora` | 反向域名应用 ID，同时用作 `.desktop` 文件名与存档目录名 |
+| `KRKRSDL2_LINUX_APP_ID` | `com.shuimo0413.yosuganosora.hdremake` | 反向域名应用 ID，同时用作 `.desktop` 文件名与存档目录名 |
 | `KRKRSDL2_ICON_NAME` | `yosuganosora` | hicolor 图标基名，需与 `.desktop` 的 `Icon=` 一致 |
 | `KRKRSDL2_LINUX_DATA_SUBDIR` | `share/yosuga-no-sora-remake` | 相对于前缀的数据目录 |
 
@@ -71,11 +71,14 @@ CMake 变量派生，因此不会出现“双击能启动、命令行启不动�
 
 ## 存档位置
 
-Linux 版遵循 XDG 规范，存档写入：
+Linux 版遵循 XDG 规范，存档写入应用专属目录下的 `savedata` 子目录：
 
 ```
-${XDG_DATA_HOME:-$HOME/.local/share}/io.github.shuimo0413.yosuganosora/
+${XDG_DATA_HOME:-$HOME/.local/share}/com.shuimo0413.yosuganosora.hdremake/savedata/
 ```
+
+这个布局与其它平台一致（iOS 同样是 `Documents/<bundle-id>/savedata`）：游戏自身
+产生的文件集中在应用目录的子目录里，不会和同一目录下的其它用户态数据混在一起。
 
 玲珑容器会把宿主机的 `$HOME` 映射进来，因此存档在应用更新后仍然保留，也可以
 直接备份或替换。设置 `KRKR_LINUX_SAVE_DIR` 可以覆盖该位置（便携/测试用）。
@@ -125,7 +128,7 @@ ll-builder export --layer --no-develop
 
 ```sh
 sudo ll-cli install ./Yosuga-no-Sora-HD-Remake-Linux-x86_64.uab
-ll-cli run io.github.shuimo0413.yosuganosora
+ll-cli run com.shuimo0413.yosuganosora.hdremake
 ```
 
 也可以直接从应用菜单启动（安装时会注册 `.desktop` 文件与图标）。

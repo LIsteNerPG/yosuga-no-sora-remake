@@ -329,7 +329,7 @@ list(APPEND KRKRSDL2_LIBS
 # the per-user save directory from it (see ApplicationSpecialPath.h); the
 # install rules at the bottom of this file reuse the same value for the
 # .desktop file name and the icon name.
-set(KRKRSDL2_LINUX_APP_ID "io.github.shuimo0413.yosuganosora" CACHE STRING "Reverse-DNS application id of the Linux build.")
+set(KRKRSDL2_LINUX_APP_ID "com.shuimo0413.yosuganosora.hdremake" CACHE STRING "Reverse-DNS application id of the Linux build.")
 set(KRKRSDL2_ICON_NAME "yosuganosora" CACHE STRING "hicolor icon basename installed for the Linux desktop integration.")
 set(KRKRSDL2_LINUX_DATA_SUBDIR "share/yosuga-no-sora-remake" CACHE STRING "Prefix-relative directory that receives the game data on Linux.")
 option(KRKRSDL2_INSTALL_LINUX_DATA "Install the game data alongside the Linux build (required by the linglong package)." ON)

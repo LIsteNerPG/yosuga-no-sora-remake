@@ -236,9 +236,9 @@ and verifies that the Linux target still compiles (no 4 GiB download); the
 data, runs an optional headless (Xvfb) smoke test, exports UAB / layer, and
 publishes 7-Zip volumes below GitHub's 2 GiB per-asset limit.
 
-The application id is `io.github.shuimo0413.yosuganosora` and saves live in
-`$XDG_DATA_HOME/io.github.shuimo0413.yosuganosora/` (by default
-`~/.local/share/io.github.shuimo0413.yosuganosora/`), so updating or
+The application id is `com.shuimo0413.yosuganosora.hdremake` (the same identifier Android and the
+Apple bundles use) and saves live in `$XDG_DATA_HOME/com.shuimo0413.yosuganosora.hdremake/savedata/`
+(by default `~/.local/share/com.shuimo0413.yosuganosora.hdremake/savedata/`), so updating or
 reinstalling the package never destroys save data. Dependencies, install
 layout, and troubleshooting are documented in `docs/linux-linglong.md`.
 

@@ -198,9 +198,9 @@ compile-check 模式只安装编译依赖并验证 Linux 目标能否编译（�
 完整模式则安装玲珑构建器、下载并校验游戏数据、执行可选的无头（Xvfb）冒烟测试、
 导出 UAB / layer，并按 GitHub 单个附件小于 2 GiB 的限制发布 7-Zip 分卷。
 
-应用 ID 为 `io.github.shuimo0413.yosuganosora`，存档写入
-`$XDG_DATA_HOME/io.github.shuimo0413.yosuganosora/`（默认
-`~/.local/share/io.github.shuimo0413.yosuganosora/`），因此更新或重装应用都不会
+应用 ID 为 `com.shuimo0413.yosuganosora.hdremake`（与 Android、Apple 端的标识一致），存档写入
+`$XDG_DATA_HOME/com.shuimo0413.yosuganosora.hdremake/savedata/`（默认
+`~/.local/share/com.shuimo0413.yosuganosora.hdremake/savedata/`），因此更新或重装应用都不会
 丢失存档。依赖、安装布局与故障排查详见 `docs/linux-linglong.md`。
 
 Kirikiri SDL2 源码使用 MIT 许可证，详见 `LICENSE`。每个二进制 Release 都随附

@@ -15,7 +15,7 @@
 version: "1"
 
 package:
-  id: io.github.shuimo0413.yosuganosora
+  id: com.shuimo0413.yosuganosora.hdremake
   name: yosuga-no-sora-remake
   version: 1.0.0.0
   kind: app
@@ -29,8 +29,8 @@ base: org.deepin.base/25.2.2
 # 第一个元素必须与 $PREFIX/bin 下的可执行文件一致；第二个参数是游戏数据目录，
 # 引擎会把非选项参数当作项目目录（与 .desktop 的 Exec 完全一致）。
 command:
-  - /opt/apps/io.github.shuimo0413.yosuganosora/files/bin/krkrsdl2
-  - /opt/apps/io.github.shuimo0413.yosuganosora/files/share/yosuga-no-sora-remake/data
+  - /opt/apps/com.shuimo0413.yosuganosora.hdremake/files/bin/krkrsdl2
+  - /opt/apps/com.shuimo0413.yosuganosora.hdremake/files/share/yosuga-no-sora-remake/data
 
 buildext:
   apt:

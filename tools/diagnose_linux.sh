@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-APP_ID="${1:-io.github.shuimo0413.yosuganosora}"
+APP_ID="${1:-com.shuimo0413.yosuganosora.hdremake}"
 FILES="/opt/apps/${APP_ID}/files"
 DATA="${FILES}/share/yosuga-no-sora-remake/data"
 
