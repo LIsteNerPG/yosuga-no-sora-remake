@@ -13,7 +13,7 @@ name: Release Linux Linglong
       prerelease:
         description: 'Publish as a prerelease'
         required: true
-        default: true
+        default: false
         type: boolean
       mode:
         description: 'full builds the linglong package; compile-check only verifies that the Linux target compiles'
@@ -258,19 +258,10 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf data
-          # The data-vN source releases live in the main repository, so a fork
-          # running this workflow has none of its own: probe the current
-          # repository first and fall back to the main one when it is empty.
-          # DATA_REPOSITORY overrides both branches.
-          data_repo="${DATA_REPOSITORY:-$GITHUB_REPOSITORY}"
-          if [[ -z "${DATA_REPOSITORY:-}" ]] &&
-             ! gh release list --repo "$GITHUB_REPOSITORY" --limit 100 2>/dev/null \
-               | grep -q '^data-v'; then
-            data_repo="shuimo0413/yosuga-no-sora-remake"
-            echo "No data-vN release in $GITHUB_REPOSITORY; using $data_repo instead."
-          fi
-          echo "data source repository: $data_repo"
-          python3 tools/fetch_data_parts.py --dest data --repo "$data_repo"
+          # The data-vN source releases are published in this repository.
+          # fetch_data_parts.py resolves it on its own: DATA_REPOSITORY when
+          # set, otherwise GITHUB_REPOSITORY (this repo), otherwise origin.
+          python3 tools/fetch_data_parts.py --dest data
 
       - name: Inject the game version into status.tjs
         if: steps.release.outputs.mode == 'full'

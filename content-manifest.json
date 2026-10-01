@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "contentVersion": "a1082ede660fed69a87e80f8c42834c0748737d763a32261c546ad17138084a6",
-  "fileCount": 23020,
-  "totalSize": 4146614738,
+  "contentVersion": "e7b7f68513851406d486933d5a1ec638416fe01d308eb06540b56088a2fc8ce2",
+  "fileCount": 23019,
+  "totalSize": 4146396630,
   "packs": [
     {
       "id": "bootstrap",
-      "fileCount": 361,
-      "totalSize": 2058909,
-      "contentVersion": "5723d7d2eaf7900302838a8896ba98a20c6f15931a40cb6552e2616fa4553bac"
+      "fileCount": 360,
+      "totalSize": 1841363,
+      "contentVersion": "031f234a490efdea007f0709f83372d16dff1dacf04b797daa634b56bc516405"
     },
     {
       "id": "fonts",
@@ -19,8 +19,8 @@
     {
       "id": "ui",
       "fileCount": 1610,
-      "totalSize": 63468184,
-      "contentVersion": "4222748ee0a4466e3fe8c26bd05a6eebd23187a4dd1d190e52d71b5e1b72f871"
+      "totalSize": 63467646,
+      "contentVersion": "34a1e82c4752c35672c2fd6a728abc5a562e3f3c231dc0b1e34410be7a50fc5a"
     },
     {
       "id": "audio",
@@ -55,8 +55,8 @@
     {
       "id": "scenario",
       "fileCount": 612,
-      "totalSize": 8756804,
-      "contentVersion": "e35247ae455131f997a8b30cc906445b34a30f3dbbed24406f99de1d8ae5df5c"
+      "totalSize": 8756780,
+      "contentVersion": "22abc9b594d457debd935172f36a55d2c5a45afc4dff42ca34e987ebc00213af"
     },
     {
       "id": "misc",
@@ -126104,14 +126104,14 @@
     },
     {
       "path": "scenario/00_a008.ks",
-      "size": 21788,
-      "sha256": "0a2172907c4862f7208e3e968439f0fc9731a7224a2da8c922b104bd536b6b23",
+      "size": 21772,
+      "sha256": "f28c09369105b3cc9840c6c6f5c11bb85f8eed9698e6ebf130da32fe113c9edf",
       "pack": "scenario"
     },
     {
       "path": "scenario/00_a008.ks.ctx",
-      "size": 21814,
-      "sha256": "f82b2216ccee5045c0de49cd31f4ff5286ea5a1565fa7b0251df2a9b3ba84e45",
+      "size": 21798,
+      "sha256": "398ea525fa47f3ed9c75ea971949b03580c617c640b7d3f2a84077fa3a92b52d",
       "pack": "scenario"
     },
     {
@@ -126188,14 +126188,14 @@
     },
     {
       "path": "scenario/00_a015a.ks",
-      "size": 31709,
-      "sha256": "6e8bac43866039a03f012655f124f2a31eec6e3ba40d49f10126d912c4155613",
+      "size": 31715,
+      "sha256": "a63117cf28fb44ad8809564e2edd94c847e5ef70467251e90d410ec9dc021045",
       "pack": "scenario"
     },
     {
       "path": "scenario/00_a015a.ks.ctx",
-      "size": 31735,
-      "sha256": "26e59ba53188ae098f0309fa1df6556747a22c01064dc6ce05eb57adba07049e",
+      "size": 31741,
+      "sha256": "dacacea3ef86a25a2ddc4edb5731c5d8cad85958316a94e611c5001be3f0da42",
       "pack": "scenario"
     },
     {
@@ -127256,14 +127256,14 @@
     },
     {
       "path": "scenario/00_b028b.ks",
-      "size": 10847,
-      "sha256": "454baa9dd28183b2c4ea6689a3faaf1bbd116d0c275aa2f13d560fd36a6518a0",
+      "size": 10831,
+      "sha256": "894cced459998749108afc4034fa025892b867da271b678e34cdf865c419afef",
       "pack": "scenario"
     },
     {
       "path": "scenario/00_b028b.ks.ctx",
-      "size": 10873,
-      "sha256": "876366605165915844e8cbedd398add2b12945307a6a8e2225e243c1e675da0a",
+      "size": 10857,
+      "sha256": "4e6a6b458429ad1666fa5d490275e29b189eb7ed42e7b13df3ef6bf5f5ed9c39",
       "pack": "scenario"
     },
     {
@@ -127628,14 +127628,14 @@
     },
     {
       "path": "scenario/00_c013c.ks",
-      "size": 8999,
-      "sha256": "3adc800ca3e6c78ceef2c5337ed0343c6cb7effb2a4d621d245ed6060c14a9c8",
+      "size": 9005,
+      "sha256": "2cd50fdadf7b0aaa8e0da1815a6ea066beebe5612a48b440fc515bd671659c22",
       "pack": "scenario"
     },
     {
       "path": "scenario/00_c013c.ks.ctx",
-      "size": 9025,
-      "sha256": "1d86424731ba4ec8602062d133169cbe0591ca44eebbe7d4ec68828f98940e16",
+      "size": 9031,
+      "sha256": "8ae507406e458490d4142945f9b1de98adc2c29e4f0e56ede23deac4fa54222b",
       "pack": "scenario"
     },
     {
@@ -129500,14 +129500,14 @@
     },
     {
       "path": "scenario/00_z001.ks",
-      "size": 19873,
-      "sha256": "f9cc621a86612a87c61c8aa8520957e3a88bea974a8da3ba70cb11c4b2d0d14d",
+      "size": 19881,
+      "sha256": "d2d7b58161bf0e9d4545284eaccb1d2e9d4fcde385ff49b23b72507324348ffa",
       "pack": "scenario"
     },
     {
       "path": "scenario/00_z001.ks.ctx",
-      "size": 19899,
-      "sha256": "cae31104a6b103c794b23ecd9b8d6633232b2332e9b864a85f47dd6210da8573",
+      "size": 19907,
+      "sha256": "4bcd717c2f51a66e83d86ddb57d1b05c76132c6dd304008cf2d34d9e7b2323b7",
       "pack": "scenario"
     },
     {
@@ -129742,12 +129742,6 @@
       "path": "system/ADVScreen.tjs",
       "size": 222479,
       "sha256": "89dc86cdea0bae57b7c40c5706915888d69e53e0bb522864a4937eff2b7f71b4",
-      "pack": "bootstrap"
-    },
-    {
-      "path": "system/ADVScreen.tjs.bak",
-      "size": 217546,
-      "sha256": "d12f239ef2a5cd2c6ec74b3b4e1ffdbec88384499d7e22939c75d965b2218933",
       "pack": "bootstrap"
     },
     {
@@ -137078,8 +137072,8 @@
     },
     {
       "path": "ui_1920/name/MP-18.png",
-      "size": 9998,
-      "sha256": "a5bccbc8d8e8126e5e73b68afcb017561d35fbaed5f064b36470b80598f1aac1",
+      "size": 9460,
+      "sha256": "658aa72207dd930b69a025552996dd1904d01378756161b7fa08deeb30ef9f29",
       "pack": "ui"
     },
     {

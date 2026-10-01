@@ -13,7 +13,7 @@ name: Release OpenHarmony / HarmonyOS HAP
       prerelease:
         description: 'Publish as a prerelease'
         required: true
-        default: true
+        default: false
         type: boolean
       sign_mode:
         description: 'HAP signing: none / community / agc'

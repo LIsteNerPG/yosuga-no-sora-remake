@@ -13,7 +13,7 @@ name: Release macOS SDL2
       prerelease:
         description: 'Publish as a prerelease'
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:
