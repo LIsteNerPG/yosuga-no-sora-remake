@@ -2403,7 +2403,27 @@ void TVPWindowWindow::TickBeat()
 							blit, blit == 0 ? "-" : SDL_GetError());
 					}
 				}
-				SDL_UpdateWindowSurfaceRects(this->window, &rect, 1);
+				// rect is in engine-surface (canvas) pixels, but the window may be
+				// larger - a 2K display forces a 2560x1440 window while the canvas stays
+				// 1920x1080. Scaling the dirty rect into window coordinates keeps the
+				// per-frame update cheap without leaving stale rows at the right and
+				// bottom edges (they showed up as a white band under the picture).
+				SDL_Rect window_rect = rect;
+				if (this->surface->w > 0 && this->surface->h > 0 &&
+				    (this->surface->w != window_surface->w || this->surface->h != window_surface->h))
+				{
+					const double scale_x = (double)window_surface->w / (double)this->surface->w;
+					const double scale_y = (double)window_surface->h / (double)this->surface->h;
+					window_rect.x = (int)(rect.x * scale_x);
+					window_rect.y = (int)(rect.y * scale_y);
+					window_rect.w = (int)(rect.w * scale_x) + 2;
+					window_rect.h = (int)(rect.h * scale_y) + 2;
+					if (window_rect.x < 0) window_rect.x = 0;
+					if (window_rect.y < 0) window_rect.y = 0;
+					if (window_rect.x + window_rect.w > window_surface->w) window_rect.w = window_surface->w - window_rect.x;
+					if (window_rect.y + window_rect.h > window_surface->h) window_rect.h = window_surface->h - window_rect.y;
+				}
+				SDL_UpdateWindowSurfaceRects(this->window, &window_rect, 1);
 				this->hasDrawn = true;
 			}
 			this->needsGraphicUpdate = false;
