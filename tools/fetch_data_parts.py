@@ -131,7 +131,8 @@ def main() -> int:
                              "(default: auto-pick the highest data-vN)")
     parser.add_argument("--repo", default="",
                         help="owner/name of the data repository (default: "
-                             "GITHUB_REPOSITORY, then the origin remote)")
+                             "DATA_REPOSITORY, then GITHUB_REPOSITORY, "
+                             "then the origin remote)")
     parser.add_argument("--dest", default="data",
                         help="Directory to extract the game data into (default: data)")
     parser.add_argument("--work", default="",
@@ -147,10 +148,11 @@ def main() -> int:
             base = re.sub(r"/releases/download/[^/]+",
                           "/releases/download/" + args.tag, base)
     else:
-        repo = args.repo or os.environ.get("GITHUB_REPOSITORY") or repo_from_git()
+        repo = (args.repo or os.environ.get("DATA_REPOSITORY")
+                or os.environ.get("GITHUB_REPOSITORY") or repo_from_git())
         if not repo:
             raise SystemExit("error: cannot determine owner/repo; pass --repo "
-                             "or --url, or set GITHUB_REPOSITORY")
+                             "or --url, or set DATA_REPOSITORY/GITHUB_REPOSITORY")
         if args.tag:
             tag = args.tag
         else:
