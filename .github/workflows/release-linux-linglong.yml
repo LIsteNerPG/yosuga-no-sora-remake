@@ -498,6 +498,11 @@ jobs:
           EXPORT_FORMAT: ${{ steps.release.outputs.export-format }}
           COMPRESSOR: ${{ steps.release.outputs.compressor }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          # ll-builder export talks to mirror-repo-linglong.deepin.com to fetch
+          # the builder utils; the 5 s default connect timeout made the export
+          # fail on a slow runner ("failed to get builder utils for target
+          # architecture x86_64", exit 255).
+          LINGLONG_CONNECT_TIMEOUT: "60"
         run: |
           set -euo pipefail
           asset_dir="$RUNNER_TEMP/release-assets"
@@ -515,15 +520,37 @@ jobs:
             # takes more time in order to get the optimal result") and took
             # ~14 minutes for this 4 GiB payload; lz4 does it in minutes for a
             # few percent more size, and the assets are already compressed.
-            ll-builder export -z "$COMPRESSOR" \
-              -o "$asset_dir/Yosuga-no-Sora-HD-Remake-Linux-$arch-$RELEASE_TAG.uab"
+            # The export downloads the builder utils from the linglong mirror,
+            # so a transient network failure used to lose the whole build.
+            for attempt in 1 2 3; do
+              if ll-builder export -z "$COMPRESSOR" \
+                   -o "$asset_dir/Yosuga-no-Sora-HD-Remake-Linux-$arch-$RELEASE_TAG.uab"; then
+                break
+              fi
+              if [[ "$attempt" == 3 ]]; then
+                echo "ll-builder export failed after 3 attempts" >&2
+                exit 1
+              fi
+              echo "::warning::ll-builder export failed on attempt ${attempt}; retrying in 30s"
+              sleep 30
+            done
           fi
           if [[ "$EXPORT_FORMAT" == 'layer' || "$EXPORT_FORMAT" == 'both' ]]; then
             # 'layer' is the deprecated format; it is still exported on demand
             # for users of linglong releases that predate UAB. The command has
             # to run in the project root (it reads linglong.yaml), so the
             # produced layer is moved into the asset directory afterwards.
-            ll-builder export --layer --no-develop
+            for attempt in 1 2 3; do
+              if ll-builder export --layer --no-develop; then
+                break
+              fi
+              if [[ "$attempt" == 3 ]]; then
+                echo "ll-builder export --layer failed after 3 attempts" >&2
+                exit 1
+              fi
+              echo "::warning::ll-builder export --layer failed on attempt ${attempt}; retrying in 30s"
+              sleep 30
+            done
             shopt -s nullglob
             layers=( ./*.layer )
             [[ "${#layers[@]}" -gt 0 ]]
